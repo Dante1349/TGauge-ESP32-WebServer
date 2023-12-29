@@ -1,0 +1,6 @@
+<div class="page">
+  <h1 class="heading">(Christmas Train)</h1>
+  <div class="button" (click)="reverseDirection()">reverse</div>
+  <input class="slider" type="range" min="0" max="100" [(ngModel)]="speed" (input)="changeSpeed()" />
+  <div class="display">Speed: {{speed}} - Real Speed: {{realSpeed}}</div>
+</div>
