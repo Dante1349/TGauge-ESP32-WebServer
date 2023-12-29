@@ -1,16 +1,13 @@
-#include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
-#include <ESP8266WebServer.h>
+#include <WiFi.h>
 #include <FS.h>
 #include <LittleFS.h>
-#include <ESP8266WebServer.h>
-//needed for library
-#include <DNSServer.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
-#include <ESP8266mDNS.h>
 
-#define TRACK_PIN D0
-#define H_BRIDGE_PIN_1 D1
-#define H_BRIDGE_PIN_2 D2
+#define TRACK_PIN 4
+#define H_BRIDGE_PIN_1 5
+#define H_BRIDGE_PIN_2 6
 
 String getContentType(String filename);
 void getSpeed();
@@ -18,7 +15,7 @@ void setConfig();
 void handleFileRequest();
 void reverseDirection();
 
-ESP8266WebServer server(80);
+WebServer server(80);
 
 int globalSpeed = 0;
 
@@ -90,7 +87,6 @@ void setup() {
 }
 
 void loop() {
-    MDNS.update();
     server.handleClient();
 }
 

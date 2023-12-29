@@ -1,8 +1,8 @@
 {
-  "name": "Christmas Train",
-  "short_name": "Christmas Train",
-  "theme_color": "#981A1A",
-  "background_color": "#981A1A",
+  "name": "Train",
+  "short_name": "Train",
+  "theme_color": "#000000",
+  "background_color": "#000000",
   "display": "fullscreen",
   "orientation": "landscape",
   "scope": "./",
