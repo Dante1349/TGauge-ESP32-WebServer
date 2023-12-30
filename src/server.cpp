@@ -5,9 +5,9 @@
 #include <ESPmDNS.h>
 #include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 
-#define TRACK_PIN 4
-#define H_BRIDGE_PIN_1 5
-#define H_BRIDGE_PIN_2 6
+#define ENB 4
+#define IN4 5
+#define IN3 6
 
 void initPins();
 void initFS();
@@ -24,10 +24,10 @@ WebServer server(80);
 int globalSpeed = 0;
 
 void initPins() {
-    pinMode(H_BRIDGE_PIN_1, OUTPUT);
-    pinMode(H_BRIDGE_PIN_2, OUTPUT);
+    pinMode(IN4, OUTPUT);
+    pinMode(IN3, OUTPUT);
 
-    digitalWrite(H_BRIDGE_PIN_1, HIGH);
+    digitalWrite(IN4, HIGH);
 }
 
 void initFS() {
@@ -148,7 +148,7 @@ void setConfig() {
 
         globalSpeed = speed;
 
-        analogWrite(TRACK_PIN, speed);
+        analogWrite(ENB, speed);
         server.send(200, "text/plain", "Speed set to: " + String(speed));
     } else {
         server.send(200, "text/plain", "no arg");
@@ -159,9 +159,9 @@ void reverseDirection() {
     String log = "reversed direction";
     Serial.println(log);
     
-    bool currPin = (digitalRead(H_BRIDGE_PIN_1) == HIGH);
-    digitalWrite(H_BRIDGE_PIN_1, !currPin);
-    digitalWrite(H_BRIDGE_PIN_2, currPin);
+    bool currPin = (digitalRead(IN4) == HIGH);
+    digitalWrite(IN4, !currPin);
+    digitalWrite(IN3, currPin);
 
     server.send(200, "text/plain", log);
 }
