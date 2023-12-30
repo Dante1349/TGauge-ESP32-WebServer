@@ -13,7 +13,7 @@
 * install platformio cli: https://docs.platformio.org/en/stable/core/installation/index.html
 * Connect ESP-Board
 * Hold BOOT and press RESET to start download mode
-* run in terminal "./uploadToESP32.sh"
+* run in terminal `./uploadToESP32.sh`
 
 # Pin config (D1 mini)
 * *GPIO4* PWM pin
