@@ -23,7 +23,7 @@
 ![wiring](assets/train.png)
 
 ## Usage
-* Look for WiFis and Connect to the "T-Gauge-Server-AP" Access Point. Enter your WiFi crendentials. The AP will automatically connect to your wifi.
+* Look for WiFis and Connect to the "Train-Server-AP" Access Point. Enter your WiFi crendentials. The AP will automatically connect to your wifi.
 * Find the "T-Gauge-Server" IP address in your Router.
 * Open a browser and use the ip like following:
   * `http://*IP*/` or try `train.local`

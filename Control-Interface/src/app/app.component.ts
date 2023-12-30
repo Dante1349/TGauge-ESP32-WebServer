@@ -43,15 +43,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.realSpeed = Number(speed)
     }))
 
-    console.log(this.getCurrentSeason())
-
     // in v2 -> d1 mini is too slow to handle that many requests
     this.subscriptions.push(interval(250)
       .pipe(
         switchMap(() => this.http.get('getSpeed', {responseType: 'text'}))
       )
       .subscribe((speed: string) => {
-        console.log(speed)
         this.speed = this.mapValueTo100(Number(speed))
         this.realSpeed = Number(speed)
       }))

@@ -9,6 +9,10 @@
 #define H_BRIDGE_PIN_1 5
 #define H_BRIDGE_PIN_2 6
 
+void initPins();
+void initFS();
+void initWiFi();
+void initWebserver();
 String getContentType(String filename);
 void getSpeed();
 void setConfig();
@@ -19,53 +23,53 @@ WebServer server(80);
 
 int globalSpeed = 0;
 
-void setup() {
-    // put your setup code here, to run once:
-    Serial.begin(115200);
-
+void initPins() {
     pinMode(H_BRIDGE_PIN_1, OUTPUT);
     pinMode(H_BRIDGE_PIN_2, OUTPUT);
 
+    digitalWrite(H_BRIDGE_PIN_1, HIGH);
+}
+
+void initFS() {
     // Initialize LittleFS
     if(!LittleFS.begin()){
         Serial.println("An Error has occurred while mounting LittleFS");
         return;
     }
+}
 
-    //WiFiManager
-    //Local intialization. Once its business is done, there is no need to keep it around
+void initWiFi() {
+    String hostname = "train";
+    WiFi.setHostname(hostname.c_str());
+
     WiFiManager wifiManager;
-    //reset saved settings
-    //wifiManager.resetSettings();
-
     //set custom ip for portal
     //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
-
-    //fetches ssid and pass from eeprom and tries to connect
-    //if it does not connect it starts an access point with the specified name
-    //here  "AutoConnectAP"
-    //and goes into a blocking loop awaiting configuration
-    wifiManager.autoConnect("T-Gauge-Server-AP");
-    //or use this for auto generated name ESP + ChipID
-    //wifiManager.autoConnect();
+    wifiManager.autoConnect("Train-Server-AP");
 
     // wait for wifi
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
-    WiFi.hostname("train");
-    Serial.println("WiFi connected");
 
-    if (!MDNS.begin("train")) {
-        Serial.println("Error setting up MDNS responder!");
-    } else {
-        Serial.println("mDNS responder started");
-    }
-
-    // Print the IP address
+    Serial.println("WiFi connected.");
+    Serial.print("Hostname: ");
+    Serial.println(WiFi.getHostname());
+    Serial.print("IP: ");
     Serial.println(WiFi.localIP());
 
+    if (!MDNS.begin(hostname)) {
+        Serial.println("Error setting up MDNS responder!");
+    } else {
+        Serial.println("mDNS responder started. Address: " + hostname + ".local");
+    }
+
+    // Add service to MDNS-SD
+    MDNS.addService("http", "tcp", 80);
+}
+
+void initWebserver() {
     server.on("/config", HTTP_GET, setConfig);
     server.on("/reverse", HTTP_GET, reverseDirection);
     server.on("/getSpeed", HTTP_GET, getSpeed);
@@ -74,16 +78,21 @@ void setup() {
     // Start the server
     server.begin();
     Serial.println("Web Server started");
+}
 
-    // Add service to MDNS-SD
-    MDNS.addService("http", "tcp", 80);
+void setup() {
+    // put your setup code here, to run once:
+    Serial.begin(115200);
+
+    initPins();
+    initFS();
+    initWiFi();
+    initWebserver();
 
     while (!Serial)  // Wait for the serial connection to be established.
         delay(50);
 
-    digitalWrite(H_BRIDGE_PIN_1, HIGH);
-
-    Serial.print("T-Gauge-Server started");
+    Serial.print("Train-Server started");
 }
 
 void loop() {
