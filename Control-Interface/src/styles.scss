@@ -1,6 +1,28 @@
+$easter-color: #00ff00;
+$halloween-color: #880808;
+$christmas-color: gold;
+$new-year-color: gold;
+$default-color: blue;
+
+@font-face {
+  font-family: 'KingthingsFlashbang';
+  src: url('media/font/kf.ttf');
+}
+@font-face {
+  font-family: 'EasterBunny';
+  src: url('media/font/eb.ttf');
+}
+@font-face {
+  font-family: 'Frightmare';
+  src: url('media/font/fm.otf');
+}
 @font-face {
   font-family: 'ChristmasSquad';
-  src: url('media/cs.otf');
+  src: url('media/font/cs.otf');
+}
+@font-face {
+  font-family: 'Kballaboard';
+  src: url('media/font/kb.ttf');
 }
 
 @keyframes spinX
@@ -12,15 +34,61 @@
 
 body, html {
   height: 100%;
-  background-image: url('media/bg.jpg');
-  background-repeat: no-repeat;
-  background-position: 9%;
-  background-size: cover;
-  color: gold;
   padding: 0;
   margin: 0;
-  font-family: 'ChristmasSquad', serif;
   user-select: none;
+}
+
+.background__easter {
+  background-image: url('media/img/bg-easter.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.background__halloween {
+  background-image: url('media/img/bg-halloween.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.background__christmas {
+  background-image: url('media/img/bg-christmas.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.background__new-year {
+  background-image: url('media/img/bg-new-year.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.background__default {
+  background-image: url('media/img/bg.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.text__easter {
+  font-family: 'EasterBunny', serif;
+  color: $easter-color;
+}
+.text__halloween {
+  font-family: 'Frightmare', serif;
+  color: $halloween-color;
+}
+.text__christmas {
+  font-family: 'ChristmasSquad', serif;
+  color: $christmas-color;
+}
+.text__new-year {
+  font-family: 'KingthingsFlashbang', serif;
+  color: $new-year-color;
+}
+.text__default {
+  font-family: 'Kballaboard', serif;
+  color: $default-color;
 }
 
 .page {
@@ -33,28 +101,72 @@ body, html {
 }
 
 .heading {
-  background: #E52222;
+  animation: spinX 10s infinite;
+  font-size: 10cqw;
+  margin: 0;
+}
+
+.heading__easter {
+  background: linear-gradient(to right, #000000 0%, #ff0000 25%, #000000 50%, #ff0000 75%);
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.2cqw $easter-color;
+  text-shadow: $easter-color 0 0 45px;
+}
+.heading__halloween {
+  background: linear-gradient(to right, #000000 0%, #ff0000 25%, #000000 50%, #ff0000 75%);
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.2cqw $halloween-color;
+  text-shadow: $halloween-color 0 0 45px;
+}
+.heading__christmas {
   background: linear-gradient(to right, #E52222 0%, #981A1A 25%, #184E07 50%, #0C8228 75%);
   background-clip: text;
   color: transparent;
-  animation: spinX 10s infinite;
-  font-size: 10cqw;
-  -webkit-text-stroke: 0.2cqw gold;
-  margin: 0;
-  text-shadow: gold 0 0 45px;
+  -webkit-text-stroke: 0.2cqw $christmas-color;
+  text-shadow: $christmas-color 0 0 45px;
+}
+.heading__new-year {
+  background: linear-gradient(to right, #000000 0%, #ff0000 25%, #000000 50%, #ff0000 75%);
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.2cqw $new-year-color;
+  text-shadow: $new-year-color 0 0 45px;
+}
+.heading__default {
+  background: linear-gradient(to right, #000000 0%, #ff0000 25%, #000000 50%, #ff0000 75%);
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0.2cqw $default-color;
+  text-shadow: $default-color 0 0 45px;
 }
 
 .slider {
   width: 90%;
   cursor: pointer;
-  accent-color: gold;
+}
+
+.slider__easter {
+  accent-color: $easter-color;
+}
+.slider__halloween {
+  accent-color: $halloween-color;
+}
+.slider__christmas {
+  accent-color: $christmas-color;
+}
+.slider__new-year {
+  accent-color: $new-year-color;
+}
+.slider__default {
+  accent-color: $default-color;
 }
 
 .button {
   display: flex;
   place-content: center;
   align-items: center;
-  border: 0.2cqw solid gold;
   width: 17cqw;
   height: 5cqw;
   border-radius: 25px;
@@ -62,8 +174,32 @@ body, html {
   cursor:pointer;
   margin: 15px;
   background:rgba(0,0,0,0.3);
-  text-shadow: gold 0 0 20px;
-  box-shadow: inset 0 0 5px gold, 0 0 5px gold;
+}
+
+.button__easter {
+  border: 0.2cqw solid $easter-color;
+  text-shadow: $easter-color 0 0 20px;
+  box-shadow: inset 0 0 5px $easter-color, 0 0 5px $easter-color;
+}
+.button__halloween {
+  border: 0.2cqw solid $halloween-color;
+  text-shadow: $halloween-color 0 0 20px;
+  box-shadow: inset 0 0 5px $halloween-color, 0 0 5px $halloween-color;
+}
+.button__christmas {
+  border: 0.2cqw solid $christmas-color;
+  text-shadow: $christmas-color 0 0 20px;
+  box-shadow: inset 0 0 5px $christmas-color, 0 0 5px $christmas-color;
+}
+.button__new-year {
+  border: 0.2cqw solid $new-year-color;
+  text-shadow: $new-year-color 0 0 20px;
+  box-shadow: inset 0 0 5px $new-year-color, 0 0 5px $new-year-color;
+}
+.button__default {
+  border: 0.2cqw solid $default-color;
+  text-shadow: $default-color 0 0 20px;
+  box-shadow: inset 0 0 5px $default-color, 0 0 5px $default-color;
 }
 
 .display {

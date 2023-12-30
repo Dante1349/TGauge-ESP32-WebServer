@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1703878516907,
+  "timestamp": 1703897993720,
   "index": "/index.html",
   "assetGroups": [
     {
@@ -29,8 +29,16 @@
       },
       "urls": [
         "/assets/icon.png",
+        "/media/bg-christmas.jpg",
+        "/media/bg-easter.jpg",
+        "/media/bg-halloween.jpg",
+        "/media/bg-new-year.jpg",
         "/media/bg.jpg",
-        "/media/cs.otf"
+        "/media/cs.otf",
+        "/media/eb.ttf",
+        "/media/fm.otf",
+        "/media/kb.ttf",
+        "/media/kf.ttf"
       ],
       "patterns": []
     }
@@ -39,13 +47,21 @@
   "hashTable": {
     "/assets/icon.png": "118a20cbc682f2241cc76d820a023aed0a474191",
     "/favicon.ico": "26d62e86cb4bd069d26bc3eb935eb7f2e79f8b92",
-    "/index.html": "1881bed61fd4aa331e486b4ada5a51a1050e0734",
-    "/main.js": "0fa70ed1980e8a550effacf4c9fbee7f1e0c5764",
+    "/index.html": "8cd1ddda2b33c08f33295c6ed0ffa8ae0db32319",
+    "/main.js": "21579b5605a5115dfa257835b98a648f425d4311",
     "/manifest.webmanifest": "74d8c0fef3ca46d0a22b7423406b3dee9915d623",
-    "/media/bg.jpg": "03d126de106a85558ed368ff4060004906b99d4d",
+    "/media/bg-christmas.jpg": "171d8d5d95adc6e7fe844f9146063c54553187c4",
+    "/media/bg-easter.jpg": "331d8a096325ce32c7ada56e6154aafe5736a0c4",
+    "/media/bg-halloween.jpg": "036e6abaef5e01c2761041621c2aca1b0ac1212d",
+    "/media/bg-new-year.jpg": "87acf423592ef555eb8f9bb6b7e1f4700494025a",
+    "/media/bg.jpg": "a8a79fed51164c0b7e2f53d4999d548e95aaf468",
     "/media/cs.otf": "eac2f018805402a85aab0a589c66235614604025",
+    "/media/eb.ttf": "be54fb55a26b92c6d790c1519ad39e604f0b8c2c",
+    "/media/fm.otf": "ef1fd73c82e2988d86cd9cc7b0b7858020a2ded4",
+    "/media/kb.ttf": "0d510d3adc03465ba53a286239f8fe00fdcf34bf",
+    "/media/kf.ttf": "a56d59da470742570dfd08d61323075b2dab9720",
     "/polyfills.js": "fda1c82c5c620f1fa442f687b3df45a037f6fcc9",
-    "/styles.css": "350a7455f3ab564818c4c6de0fa7be7ffb76ae94"
+    "/styles.css": "68d87529e884026470bfdb6501d7bd8b0c4314e0"
   },
   "navigationUrls": [
     {

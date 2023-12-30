@@ -1,6 +1,6 @@
-<div class="page">
-  <h1 class="heading">(Christmas Train)</h1>
-  <div class="button" (click)="reverseDirection()">reverse</div>
-  <input class="slider" type="range" min="0" max="100" [(ngModel)]="speed" (input)="changeSpeed()" />
+<div class="page" [ngClass]="[getSeasonalClass(COMPONENT_TYPE.Text), getSeasonalClass(COMPONENT_TYPE.Background)]">
+  <h1 class="heading" [ngClass]="getSeasonalClass(COMPONENT_TYPE.Heading)">{{getHeadingText()}}</h1>
+  <div class="button" [ngClass]="getSeasonalClass(COMPONENT_TYPE.Button)" (click)="reverseDirection()">reverse</div>
+  <input class="slider" [ngClass]="getSeasonalClass(COMPONENT_TYPE.Slider)" type="range" min="0" max="100" [(ngModel)]="speed" (input)="changeSpeed()" />
   <div class="display">Speed: {{speed}} - Real Speed: {{realSpeed}}</div>
 </div>
