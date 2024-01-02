@@ -38,12 +38,17 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.subscriptions.push(this.http.get('getSpeed', {responseType: 'text'}).subscribe((speed) => {
-      this.speed = this.mapValueTo100(Number(speed))
-      this.realSpeed = Number(speed)
-    }))
+    this.startPolling()
+    window.addEventListener('focus', () => {
+      this.unsubscribeAll();
+      this.startPolling();
+    })
+    window.addEventListener('blur', () => {
+      this.stopPolling();
+    })
+  }
 
-    // in v2 -> d1 mini is too slow to handle that many requests
+  startPolling() {
     this.subscriptions.push(interval(250)
       .pipe(
         switchMap(() => this.http.get('getSpeed', {responseType: 'text'}))
@@ -53,8 +58,14 @@ export class AppComponent implements OnInit, OnDestroy {
         this.realSpeed = Number(speed)
       }))
   }
+  stopPolling() {
+    this.unsubscribeAll()
+  }
 
   ngOnDestroy() {
+    this.unsubscribeAll()
+  }
+  private unsubscribeAll(): void {
     this.subscriptions.forEach(s => s.unsubscribe())
   }
 
