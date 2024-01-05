@@ -1,9 +1,13 @@
 #include <WiFi.h>
+#include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
 #include <FS.h>
 #include <LittleFS.h>
-#include <WebServer.h>
+#include <Arduino.h>
+#include <WebSocketsServer.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h> // needs to be imported after WiFiManager.h because of colliding definitions
 #include <ESPmDNS.h>
-#include <WiFiManager.h>         //https://github.com/tzapu/WiFiManager
+
 #include <ArduinoJson.h>
 
 #define ENB 4
@@ -27,17 +31,19 @@ void initPins();
 void initFS();
 void saveConfigCallback();
 void initWiFi();
+void notFound(AsyncWebServerRequest *request);
 void initWebserver();
 String getContentType(String filename);
-void getSpeed();
-void getSpeedLimit();
-void forgetConfig();
-void setConfig();
-void handleFileRequest();
-void reverseDirection();
+void getLocalIP(AsyncWebServerRequest *request);
+void getSpeed(AsyncWebServerRequest *request);
+void getSpeedLimit(AsyncWebServerRequest *request);
+void forgetConfig(AsyncWebServerRequest *request);
+void setConfig(AsyncWebServerRequest *request);
+void reverseDirection(AsyncWebServerRequest *request);
 
 WiFiManager wifiManager;
-WebServer server(80);
+AsyncWebServer server(80);
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 int globalSpeed = 0;
 byte* leds;
@@ -70,7 +76,6 @@ void initFS() {
     }
 }
 
-
 void saveConfigCallback() {
     Serial.println("Save config callback");
 
@@ -79,7 +84,7 @@ void saveConfigCallback() {
 
     Serial.println(String(config.speedLimit));
     Serial.println(String(config.ledConfig));
-  saveConfig(config); // Save the config to LittleFS
+    saveConfig(config); // Save the config to LittleFS
 }
 
 void initWiFi() {
@@ -121,16 +126,38 @@ void initWiFi() {
     MDNS.addService("http", "tcp", 80);
 }
 
+void notFound(AsyncWebServerRequest *request) {
+    request->send(404, "text/plain", "Not found");
+}
+
 void initWebserver() {
     server.on("/config", HTTP_GET, setConfig);
     server.on("/reverse", HTTP_GET, reverseDirection);
+    server.on("/getLocalIP", HTTP_GET, getLocalIP);
     server.on("/getSpeed", HTTP_GET, getSpeed);
     server.on("/getSpeedLimit", HTTP_GET, getSpeedLimit);
     server.on("/forgetConfig", HTTP_GET, forgetConfig);
-    server.onNotFound(handleFileRequest);
+    server.onNotFound(notFound);
+
+    AsyncCallbackWebHandler* handler = new AsyncCallbackWebHandler();
+    handler->onRequest( [](AsyncWebServerRequest *request) {
+        String path = request->url();
+
+        if (path.endsWith("/")) {
+            path += "index.html";
+        }
+
+        if (LittleFS.exists(path)) {
+            request->send(LittleFS, path, getContentType(path));
+        } else {
+            request->send(404, "text/plain", "File not found");
+        }
+    });
+    server.addHandler(handler);
 
     // Start the server
     server.begin();
+    webSocket.begin();
     Serial.println("Web Server started");
 }
 
@@ -152,7 +179,7 @@ void setup() {
 }
 
 void loop() {
-    server.handleClient();
+    webSocket.loop();
 }
 
 void saveConfig(const Config& config) {
@@ -224,15 +251,19 @@ String getContentType(String filename) {
   return "text/plain";
 }
 
-void getSpeed() {
-    server.send(200, "text/plain",  String(globalSpeed));
+void getLocalIP(AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", WiFi.localIP().toString());
 }
 
-void getSpeedLimit() {
-    server.send(200, "text/plain",  String(config.speedLimit));
+void getSpeed(AsyncWebServerRequest *request) {
+    request->send(200, "text/plain",  String(globalSpeed));
 }
 
-void forgetConfig() {
+void getSpeedLimit(AsyncWebServerRequest *request) {
+    request->send(200, "text/plain",  String(config.speedLimit));
+}
+
+void forgetConfig(AsyncWebServerRequest *request) {
     wifiManager.resetSettings();
     Serial.println("Removed wifi settings");
     if(LittleFS.remove("/config.json")){
@@ -240,28 +271,14 @@ void forgetConfig() {
     } else {
         Serial.println("Could not remove config file");
     }
-    server.send(200, "text/plain",  "deleted wifi config");
+    request->send(200, "text/plain",  "deleted wifi config");
     ESP.restart();
 }
 
-void handleFileRequest() {
-    String path = server.uri();
-    Serial.println(path);
-    if (path.endsWith("/")) { path += "index.html"; }
-
-    if (LittleFS.exists(path)) {
-        File file = LittleFS.open(path, "r");
-        server.streamFile(file, getContentType(path)); // Get content type dynamically
-        file.close();
-    } else {
-        server.send(404, "text/plain", "File Not Found");
-    }
-}
-
-void setConfig() {
-    if (server.hasArg("speed") == true) {
-        Serial.println("Set Config -> speed: " + server.arg("speed"));
-        int speed = server.arg("speed").toInt();
+void setConfig(AsyncWebServerRequest *request) {
+    if (request->hasArg("speed")) {
+        Serial.println("Set Config -> speed: " + request->arg("speed"));
+        int speed = request->arg("speed").toInt();
         if (speed > 0) {
             if(speed > 255) {
                 speed = 255;
@@ -270,14 +287,14 @@ void setConfig() {
         } else {
             speed = 0;
         }
-
         globalSpeed = speed;
-
+        String speedTXT = String(speed);
+        webSocket.broadcastTXT(speedTXT);
         analogWrite(ENB, speed);
-        server.send(200, "text/plain", "Set config -> speed: " + String(speed));
-    } else if (server.hasArg("brightness") && server.hasArg("leds")) {
-        int brightness = server.arg("brightness").toInt();
-        String ledConfig = server.arg("leds");
+        request->send(200, "text/plain", "Set config -> speed: " + String(speed));
+    } else if (request->hasArg("brightness") && request->hasArg("leds")) {
+        int brightness = request->arg("brightness").toInt();
+        String ledConfig = request->arg("leds");
         Serial.println("Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
 
         // reset array pointer
@@ -304,14 +321,14 @@ void setConfig() {
 
         setBrightness(brightness);
         updateShiftRegister();
-        server.send(200, "text/plain", "Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
+        request->send(200, "text/plain", "Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
     }
     else {
-        server.send(200, "text/plain", "No arg server provided");
+        request->send(200, "text/plain", "No arg server provided");
     }
 }
 
-void reverseDirection() {
+void reverseDirection(AsyncWebServerRequest *request) {
     String log = "reversed direction";
     Serial.println(log);
     
@@ -319,5 +336,5 @@ void reverseDirection() {
     digitalWrite(IN4, !currPin);
     digitalWrite(IN3, currPin);
 
-    server.send(200, "text/plain", log);
+    request->send(200, "text/plain", log);
 }

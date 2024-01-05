@@ -3,7 +3,7 @@ import {CommonModule} from '@angular/common';
 import {RouterOutlet} from '@angular/router';
 import {HttpClient} from "@angular/common/http";
 import {FormsModule} from "@angular/forms";
-import {interval, Subscription, switchMap} from "rxjs";
+import {Subscription} from "rxjs";
 
 enum Season {
   Christmas = 'Christmas',
@@ -31,8 +31,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private subscriptions: Subscription[] = [];
   speed: number = 0;
   speedLimit: number = 255;
+  ip: string = '127.0.0.1';
   realSpeed: number = 0;
   COMPONENT_TYPE = ComponentType;
+  private webSocket: WebSocket;
 
   constructor(private http: HttpClient) {
   }
@@ -41,13 +43,16 @@ export class AppComponent implements OnInit, OnDestroy {
     this.subscriptions.push(
       this.http.get('getSpeedLimit', {responseType: "text"}).subscribe((sL) => {
         if (sL !== "" && Number(sL) > 0 && Number(sL) < 256) {
-          console.log("speed limit: ", sL)
           this.speedLimit = Number(sL);
         }
-      }, (error) => {
-        console.info("Cannot fetch speed limit.", error);
+      }),
+      this.http.get('getLocalIP', {responseType: "text"}).subscribe((ip) => {
+          this.ip = ip;
+          this.initWebSocket(ip);
       })
     )
+
+
 
     /*setInterval(() => {
       setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000001').subscribe(() => {})},2000)
@@ -59,34 +64,28 @@ export class AppComponent implements OnInit, OnDestroy {
       setTimeout(()=>{this.http.get('/config?brightness=100&leds=01000000').subscribe(() => {})},14000)
       setTimeout(()=>{this.http.get('/config?brightness=100&leds=10000000').subscribe(() => {})},16000)
     }, 18000)*/
-
-    this.startPolling()
-    window.addEventListener('focus', () => {
-      this.unsubscribeAll();
-      this.startPolling();
-    })
-    window.addEventListener('blur', () => {
-      this.stopPolling();
-    })
-  }
-
-  startPolling() {
-    this.subscriptions.push(interval(250)
-      .pipe(
-        switchMap(() => this.http.get('getSpeed', {responseType: 'text'}))
-      )
-      .subscribe((speed: string) => {
-        this.speed = this.mapValueTo100(Number(speed))
-        this.realSpeed = Number(speed)
-      }))
-  }
-
-  stopPolling() {
-    this.unsubscribeAll()
   }
 
   ngOnDestroy() {
     this.unsubscribeAll()
+  }
+
+  initWebSocket(ip: string) {
+    this.webSocket = new WebSocket(`ws://${ip}:81`);
+
+    this.webSocket.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    this.webSocket.onmessage = (event) => {
+      console.log('Received message:', event.data);
+      this.realSpeed = event.data;
+      this.speed = this.mapValueTo100(this.realSpeed);
+    };
+
+    this.webSocket.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
   }
 
   private unsubscribeAll(): void {
