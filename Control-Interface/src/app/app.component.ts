@@ -28,16 +28,38 @@ enum ComponentType {
   templateUrl: './app.component.html'
 })
 export class AppComponent implements OnInit, OnDestroy {
-  private readonly SPEED_LIMIT: number = 120 // has to be a value from 0 to 255
-  private subscriptions: Subscription[] = []
+  private subscriptions: Subscription[] = [];
   speed: number = 0;
+  speedLimit: number = 255;
   realSpeed: number = 0;
-  COMPONENT_TYPE = ComponentType
+  COMPONENT_TYPE = ComponentType;
 
   constructor(private http: HttpClient) {
   }
 
   ngOnInit() {
+    this.subscriptions.push(
+      this.http.get('getSpeedLimit', {responseType: "text"}).subscribe((sL) => {
+        if (sL !== "" && Number(sL) > 0 && Number(sL) < 256) {
+          console.log("speed limit: ", sL)
+          this.speedLimit = Number(sL);
+        }
+      }, (error) => {
+        console.info("Cannot fetch speed limit.", error);
+      })
+    )
+
+    /*setInterval(() => {
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000001').subscribe(() => {})},2000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000010').subscribe(() => {})},4000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000100').subscribe(() => {})},6000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00001000').subscribe(() => {})},8000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00010000').subscribe(() => {})},10000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00100000').subscribe(() => {})},12000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=01000000').subscribe(() => {})},14000)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=10000000').subscribe(() => {})},16000)
+    }, 18000)*/
+
     this.startPolling()
     window.addEventListener('focus', () => {
       this.unsubscribeAll();
@@ -58,6 +80,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.realSpeed = Number(speed)
       }))
   }
+
   stopPolling() {
     this.unsubscribeAll()
   }
@@ -65,18 +88,19 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.unsubscribeAll()
   }
+
   private unsubscribeAll(): void {
     this.subscriptions.forEach(s => s.unsubscribe())
   }
 
   private mapValueTo255(input: number): number {
     const clampedInput = Math.min(Math.max(input, 0), 100)
-    return Math.round((clampedInput / 100) * this.SPEED_LIMIT);
+    return Math.round((clampedInput / 100) * this.speedLimit);
   }
 
   private mapValueTo100(input: number): number {
-    const clampedInput = Math.min(Math.max(input, 0), this.SPEED_LIMIT)
-    return Math.round((clampedInput / this.SPEED_LIMIT) * 100);
+    const clampedInput = Math.min(Math.max(input, 0), this.speedLimit)
+    return Math.round((clampedInput / this.speedLimit) * 100);
   }
 
   changeSpeed(): void {

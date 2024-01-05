@@ -1,6 +1,6 @@
 {
   "configVersion": 1,
-  "timestamp": 1704211243210,
+  "timestamp": 1704414716735,
   "index": "/index.html",
   "assetGroups": [
     {
@@ -48,7 +48,7 @@
     "/assets/icon.png": "eb7b299d84b7632d9ca3e03bad62e3b29c022f3d",
     "/favicon.ico": "26d62e86cb4bd069d26bc3eb935eb7f2e79f8b92",
     "/index.html": "64a12a7baaa2c66b6bfe51a23cca3808a703640f",
-    "/main.js": "42f33f778f5c5094d3085bc65714b8c4cb2c50bb",
+    "/main.js": "cee6f00f8af582d9b878012e6c3d8235e7a7cd5c",
     "/manifest.webmanifest": "74d8c0fef3ca46d0a22b7423406b3dee9915d623",
     "/media/bg-christmas.jpg": "171d8d5d95adc6e7fe844f9146063c54553187c4",
     "/media/bg-easter.jpg": "331d8a096325ce32c7ada56e6154aafe5736a0c4",
