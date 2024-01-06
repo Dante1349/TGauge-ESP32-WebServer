@@ -54,16 +54,17 @@ export class AppComponent implements OnInit, OnDestroy {
 
 
 
-    /*setInterval(() => {
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000001').subscribe(() => {})},2000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000010').subscribe(() => {})},4000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000100').subscribe(() => {})},6000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00001000').subscribe(() => {})},8000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00010000').subscribe(() => {})},10000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00100000').subscribe(() => {})},12000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=01000000').subscribe(() => {})},14000)
-      setTimeout(()=>{this.http.get('/config?brightness=100&leds=10000000').subscribe(() => {})},16000)
-    }, 18000)*/
+    /*const i = 250;
+    setInterval(() => {
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000001').subscribe(() => {})},i)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000010').subscribe(() => {})},i*2)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00000100').subscribe(() => {})},i*3)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00001000').subscribe(() => {})},i*4)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00010000').subscribe(() => {})},i*5)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=00100000').subscribe(() => {})},i*6)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=01000000').subscribe(() => {})},i*7)
+      setTimeout(()=>{this.http.get('/config?brightness=100&leds=10000000').subscribe(() => {})},i*8)
+    }, i*8)*/
   }
 
   ngOnDestroy() {

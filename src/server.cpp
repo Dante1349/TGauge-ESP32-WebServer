@@ -25,7 +25,12 @@ struct Config {
 
 void saveConfig(const Config& config);
 void loadConfig(Config& config);
-void updateShiftRegister();
+String generateHouseLights(int currentHour, int currentMinute, String lastOutput);
+float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, float interval);
+void turnOnLights(float percentage);
+void turnOffLights(float percentage);
+void turnOffAllLights();
+void updateShiftRegister(int brightness, String ledString);
 void setBrightness(int b);
 void initPins();
 void initFS();
@@ -49,10 +54,16 @@ int globalSpeed = 0;
 byte* leds;
 const int chunkSize = 8;
 int numChunks = 0;
-Config config ={"255","00000000"};
+Config config = {"255","00000000"};
 // Define custom parameters
 WiFiManagerParameter speed_limit("speedLimit", "Speed Limit (0-255)", config.speedLimit, 64);
 WiFiManagerParameter led_config("ledConfig", "LED-Config", config.ledConfig, 64);
+
+#define MAX_HOUSES 8 // 10 bytes for 80 houses (8 houses per byte)
+
+unsigned long lastTimeUpdate = 0;
+unsigned long updateInterval = 0.016666 * 60 * 1000; // Update interval: 30 minutes
+String currentLights="00000000"; // Previous lights status
 
 void initPins() {
     pinMode(IN4, OUTPUT);
@@ -168,18 +179,38 @@ void setup() {
     while (!Serial)  // Wait for the serial connection to be established.
         delay(50);
 
-    Serial.print("Train-Server initializing...");
+    Serial.println("Train-Server initializing...");
 
     initPins();
     initFS();
     initWiFi();
     initWebserver();
 
-    Serial.print("Train-Server started");
+    Serial.println("Train-Server started");
 }
 
+int simulatedHour = 0;
+int intervalCount = 0;
 void loop() {
     webSocket.loop();
+
+    unsigned long currentMillis = millis();
+
+    if (currentMillis - lastTimeUpdate >= 1000/5) {
+        lastTimeUpdate = currentMillis;
+        intervalCount++;
+
+        if (intervalCount > 5) {
+          intervalCount = 0;
+          simulatedHour = (simulatedHour + 1) % 24; // Increment simulated hour every 10 minutes
+        }
+
+        String lights = generateHouseLights(simulatedHour, intervalCount*10, currentLights);
+        Serial.println("lights: :"+lights);
+        updateShiftRegister(100, lights);
+
+        Serial.println("Simulated time - " + String(simulatedHour) + ":" + String(intervalCount*10));
+    }
 }
 
 void saveConfig(const Config& config) {
@@ -221,7 +252,134 @@ void loadConfig(Config& config) {
   configFile.close();
 }
 
-void updateShiftRegister() {
+
+String generateHouseLights(int currentHour, int currentMinute, String lastOutput) {
+  if (lastOutput.length() != MAX_HOUSES) {
+    return "Invalid length";
+  }
+
+  currentLights = lastOutput; // Update the current lights state from the last output
+
+  if (currentHour >= 6 && currentHour < 17) {
+    turnOffAllLights(); // Lights off from 6:00 to 17:00
+  } else if (currentHour >= 17 && currentHour < 21) {
+    float percentage = calculatePercentage(currentHour, currentMinute, 17, 21, 0.045);
+    Serial.println("percentage"+String(percentage));
+    turnOnLights(percentage); // Turn on 4.5% of lights every 10 minutes from 17:00 to 21:00
+  } else if (currentHour >= 21 && currentHour < 22) {
+    float percentage = calculatePercentage(currentHour, currentMinute, 21, 22, 0.0125);
+    turnOnLights(percentage); // Turn on 1.25% of lights every 10 minutes from 21:00 to 22:30
+  } else if (currentHour >= 23 && currentHour < 24) {
+    float percentage = calculatePercentage(currentHour, currentMinute, 23, 24, 0.069);
+    turnOffLights(percentage); // Turn off 6.9% of lights every 10 minutes from 23:30 to 2:00
+  } else if (currentHour >= 0 && currentHour < 6) {
+    float percentage = calculatePercentage(currentHour, currentMinute, 0, 6, 0.005);
+    turnOffLights(percentage); // Turn off 0.5% of lights every 10 minutes from 2:00 to 6:00
+  }
+
+  return currentLights;
+}
+
+float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, float interval) {
+    Serial.println("calculatePercentage");
+    Serial.println(String(currentHour)+","+String(currentMinute)+","+String(startHour)+","+String(endHour)+","+String(interval));
+  int totalMinutes = (endHour - startHour) * 60;
+  Serial.println("totalMinutes: "+String(totalMinutes));
+  int elapsedMinutes = ((currentHour - startHour) * 60) + currentMinute;
+  Serial.println("elapsedMinutes: "+String(elapsedMinutes));
+  float steps = totalMinutes / (interval * 10); // 10 minutes per step for given interval
+  Serial.println("steps: "+String(steps));
+  return min(double(elapsedMinutes) / steps, 1.0);
+}
+
+void turnOnLights(float percentage) {
+    int lightsToTurnOn=1;
+    if(percentage>=1.0) {
+        lightsToTurnOn = MAX_HOUSES-1 * percentage;
+    }
+
+    int zeros = 0;
+    for(int i=0;i<currentLights.length(); i++) {
+        if(currentLights[0]=='0') {
+            zeros++;
+        }
+    }
+
+    if(lightsToTurnOn>zeros) {
+        lightsToTurnOn = zeros;
+    }
+
+    Serial.println("lightsToTurnOn"+String(lightsToTurnOn));
+    for (int i = 0; i < lightsToTurnOn; i++) {
+        int randomIndex;
+        do {
+            randomIndex = random(0, MAX_HOUSES);
+            Serial.println(String(randomIndex)+","+currentLights);
+        } while (currentLights[randomIndex] == '1');
+
+        currentLights[randomIndex] = '1';
+    }
+}
+
+void turnOffLights(float percentage) {
+  int lightsToTurnOff = 1;
+  if(percentage>=1.0) {
+      lightsToTurnOff = MAX_HOUSES-1 * percentage;
+  }
+
+  int ones = 0;
+  for(int i=0;i<currentLights.length(); i++) {
+      if(currentLights[0]=='1') {
+          ones++;
+      }
+  }
+
+  if(lightsToTurnOff>ones) {
+      lightsToTurnOff = ones;
+  }
+
+  Serial.println("lightsToTurnOff"+String(lightsToTurnOff));
+  for (int i = 0; i < lightsToTurnOff; i++) {
+    int randomIndex;
+    do {
+      randomIndex = random(0, MAX_HOUSES);
+      Serial.println(String(randomIndex)+","+String(currentLights));
+    } while (currentLights[randomIndex] == '0');
+
+    currentLights[randomIndex] = '0';
+  }
+}
+
+void turnOffAllLights() {
+  currentLights = "00000000"; // Set all lights to off
+}
+
+
+void updateShiftRegister(int brightness, String ledString) {
+    // reset array pointer
+    if (leds != nullptr) {
+        delete[] leds;
+        leds = nullptr;
+        numChunks = 0;
+    }
+
+    String ledconf = ledString;
+    // pad with zeros if the input is shorter than the chunk size
+    while(ledconf.length() < chunkSize) {
+        ledconf = "0" + ledconf;
+    }
+
+    numChunks = ledconf.length() / chunkSize;
+
+    leds = new byte[numChunks];
+    for(int i=0; i<numChunks; i++) {
+        String chunk = ledconf.substring( i * chunkSize, ( i + 1 ) * chunkSize);
+        int intVal = strtol(chunk.c_str(), NULL, 2);
+        leds[i] = static_cast<byte>(intVal);
+    }
+
+    setBrightness(brightness);
+
     digitalWrite(RCLK, LOW);
     Serial.println("LED config:");
     for(int i = 0; i < numChunks; i++) {
@@ -297,30 +455,8 @@ void setConfig(AsyncWebServerRequest *request) {
         String ledConfig = request->arg("leds");
         Serial.println("Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
 
-        // reset array pointer
-        if (leds != nullptr) {
-            delete[] leds;
-            leds = nullptr;
-            numChunks = 0;
-        }
+        updateShiftRegister(brightness, ledConfig);
 
-        // pad with zeros if the input is shorter than the chunk size
-        while(ledConfig.length() < chunkSize) {
-            ledConfig = "0" + ledConfig;
-        }
-
-        numChunks = ledConfig.length() / chunkSize;
-
-        leds = new byte[numChunks];
-        for(int i=0; i<numChunks; i++) {
-            String chunk = ledConfig.substring( i * chunkSize, ( i + 1 ) * chunkSize);
-            int intVal = strtol(chunk.c_str(), NULL, 2);
-            leds[i] = static_cast<byte>(intVal);
-        }
-
-
-        setBrightness(brightness);
-        updateShiftRegister();
         request->send(200, "text/plain", "Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
     }
     else {
