@@ -20,7 +20,7 @@
 * *GPIO5* H-Bridge Pin 1
 * *GPIO6* H-Bridge Pin 2
 
-![wiring](assets/train.png)
+![wiring](assets/light_time_table.drawio.svg)
 
 ## Usage
 * Look for WiFis and Connect to the "Train-Server-AP" Access Point. Enter your WiFi crendentials. The AP will automatically connect to your wifi.
