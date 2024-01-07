@@ -307,7 +307,7 @@ void generateLightState(int currentHour, int currentMinute) {
 
     if (currentHour >= 6 && currentHour < 8) {
         float percentage = calculatePercentage(currentHour, currentMinute, 6, 8, 30);
-        turnOnLights(percentage); // 90% Off->On from 07:00 to 08:00
+        turnOnLights(percentage); // 90% Off->On from 06:00 to 08:00
     } else if (currentHour >= 8 && currentHour < 9) {
         float percentage = calculatePercentage(currentHour, currentMinute, 8, 9, 40);
         turnOffLights(percentage); // 90% Off->On from 08:00 to 09:00
