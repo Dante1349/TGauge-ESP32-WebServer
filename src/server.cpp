@@ -19,17 +19,22 @@
 #define SRCLK 14
 
 struct Config {
-  char speedLimit[64];
-  char ledConfig[64];
+    char speedLimit[64];
+    char ledCount[64];
+    char ledBrightness[64];
 };
 
 void saveConfig(const Config& config);
 void loadConfig(Config& config);
-String generateHouseLights(int currentHour, int currentMinute, String lastOutput);
-float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, float interval);
+String generateZeroString(int amount);
+void generateLightState(int currentHour, int currentMinute);
+float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, int percentage);
 void turnOnLights(float percentage);
 void turnOffLights(float percentage);
+int countZeros(String inputString);
+int countOnes(String inputString);
 void turnOffAllLights();
+String byteToBinaryString(byte value);
 void updateShiftRegister(int brightness, String ledString);
 void setBrightness(int b);
 void initPins();
@@ -38,6 +43,7 @@ void saveConfigCallback();
 void initWiFi();
 void notFound(AsyncWebServerRequest *request);
 void initWebserver();
+void initLights();
 String getContentType(String filename);
 void getLocalIP(AsyncWebServerRequest *request);
 void getSpeed(AsyncWebServerRequest *request);
@@ -54,16 +60,15 @@ int globalSpeed = 0;
 byte* leds;
 const int chunkSize = 8;
 int numChunks = 0;
-Config config = {"255","00000000"};
+Config config = {"255","32", "100"};
 // Define custom parameters
 WiFiManagerParameter speed_limit("speedLimit", "Speed Limit (0-255)", config.speedLimit, 64);
-WiFiManagerParameter led_config("ledConfig", "LED-Config", config.ledConfig, 64);
-
-#define MAX_HOUSES 8 // 10 bytes for 80 houses (8 houses per byte)
+WiFiManagerParameter led_count("ledCount", "LED Count", config.ledCount, 64);
+WiFiManagerParameter led_brightness("ledBrightness", "LED Brightness (0-255)", config.ledBrightness, 64);
 
 unsigned long lastTimeUpdate = 0;
 unsigned long updateInterval = 0.016666 * 60 * 1000; // Update interval: 30 minutes
-String currentLights="00000000"; // Previous lights status
+String currentLights="0"; // Previous lights status
 
 void initPins() {
     pinMode(IN4, OUTPUT);
@@ -91,10 +96,12 @@ void saveConfigCallback() {
     Serial.println("Save config callback");
 
     strlcpy(config.speedLimit, speed_limit.getValue(), sizeof(config.speedLimit));
-    strlcpy(config.ledConfig, speed_limit.getValue(), sizeof(config.ledConfig));
+    strlcpy(config.ledCount, led_count.getValue(), sizeof(config.ledCount));
+    strlcpy(config.ledBrightness, led_brightness.getValue(), sizeof(config.ledBrightness));
 
-    Serial.println(String(config.speedLimit));
-    Serial.println(String(config.ledConfig));
+    Serial.println("config.speedLimit: "+String(config.speedLimit));
+    Serial.println("config.ledCount: "+String(config.ledCount));
+    Serial.println("config.ledBrightness: "+String(config.ledBrightness));
     saveConfig(config); // Save the config to LittleFS
 }
 
@@ -106,7 +113,8 @@ void initWiFi() {
 
     // Add custom parameters to WiFiManager
     wifiManager.addParameter(&speed_limit);
-    wifiManager.addParameter(&led_config);
+    wifiManager.addParameter(&led_count);
+    wifiManager.addParameter(&led_brightness);
 
     // Save custom parameter on save
     wifiManager.setSaveConfigCallback(saveConfigCallback);
@@ -172,6 +180,18 @@ void initWebserver() {
     Serial.println("Web Server started");
 }
 
+void initLights() {
+    unsigned long currentMillis = millis();
+
+    // Calculate elapsed time in hours and minutes
+    unsigned long elapsedHours = (currentMillis / (1000 * 60 * 60)) % 24;
+    unsigned long elapsedMinutes = (currentMillis / (1000 * 60)) % 60;
+
+    // Initialize currentLights based on the calculated time
+    generateLightState(elapsedHours, elapsedMinutes);
+    updateShiftRegister(atoi(config.ledBrightness), currentLights);
+}
+
 void setup() {
     // put your setup code here, to run once:
     Serial.begin(115200);
@@ -185,6 +205,7 @@ void setup() {
     initFS();
     initWiFi();
     initWebserver();
+    initLights();
 
     Serial.println("Train-Server started");
 }
@@ -196,125 +217,154 @@ void loop() {
 
     unsigned long currentMillis = millis();
 
-    if (currentMillis - lastTimeUpdate >= 1000/5) {
+    int interval = 1000 * 60 * 10; // every 10 minutes;
+    int testInterval = 1000 / 6; // 1 second == 1 hour
+
+    if (currentMillis - lastTimeUpdate >= interval) {
+        String hour = String(simulatedHour);
+        if(hour.length() == 1){
+            hour = "0" + hour;
+        }
+
+        String minute = String(intervalCount*10);
+        if(minute.length() == 1){
+            minute = "0" + minute;
+        }
+
+        Serial.println("[" + hour + ":" + minute + "]");
+
         lastTimeUpdate = currentMillis;
         intervalCount++;
 
         if (intervalCount > 5) {
-          intervalCount = 0;
-          simulatedHour = (simulatedHour + 1) % 24; // Increment simulated hour every 10 minutes
+            intervalCount = 0;
+            simulatedHour = (simulatedHour + 1) % 24;
         }
 
-        String lights = generateHouseLights(simulatedHour, intervalCount*10, currentLights);
-        Serial.println("lights: :"+lights);
-        updateShiftRegister(100, lights);
+        generateLightState(simulatedHour, intervalCount*10);
+        updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
-        Serial.println("Simulated time - " + String(simulatedHour) + ":" + String(intervalCount*10));
+        Serial.println("--------------------------------------------------------------------------------");
     }
 }
 
 void saveConfig(const Config& config) {
-  File configFile = LittleFS.open("/config.json", "w");
-  if (!configFile) {
-    Serial.println("Failed to open config file for writing");
-    return;
-  }
+    File configFile = LittleFS.open("/config.json", "w");
+    if (!configFile) {
+        Serial.println("Failed to open config file for writing");
+        return;
+    }
 
-  StaticJsonDocument<256> jsonDocument;
-  jsonDocument["speedLimit"] = config.speedLimit;
-  jsonDocument["ledConfig"] = config.ledConfig;
+    StaticJsonDocument<256> jsonDocument;
+    jsonDocument["speedLimit"] = config.speedLimit;
+    jsonDocument["ledCount"] = config.ledCount;
+    jsonDocument["ledBrightness"] = config.ledBrightness;
 
-  if (serializeJson(jsonDocument, configFile) == 0) {
-    Serial.println(F("Failed to write to file"));
-  }
+    if (serializeJson(jsonDocument, configFile) == 0) {
+        Serial.println(F("Failed to write to file"));
+    }
 
-  configFile.close();
+    configFile.close();
 }
 
 void loadConfig(Config& config) {
-  File configFile = LittleFS.open("/config.json", "r");
-  if (!configFile) {
-    Serial.println("Config file doesn't exist. Creating default configuration.");
-    saveConfig(config); // Save default configuration to create the file
-    return;
-  }
+    File configFile = LittleFS.open("/config.json", "r");
+    if (!configFile) {
+        Serial.println("Config file doesn't exist. Creating default configuration.");
+        saveConfig(config); // create default config file
+        return;
+    }
 
-  StaticJsonDocument<256> jsonDocument;
-  DeserializationError error = deserializeJson(jsonDocument, configFile);
-  if (error) {
-    Serial.println("Failed to read file, using default configuration");
-    return;
-  }
+    StaticJsonDocument<256> jsonDocument;
+    DeserializationError error = deserializeJson(jsonDocument, configFile);
+    if (error) {
+        Serial.println("Failed to read file, using default configuration");
+        return;
+    }
 
-  strlcpy(config.speedLimit, jsonDocument["speedLimit"] | "", sizeof(config.speedLimit));
-  strlcpy(config.ledConfig, jsonDocument["ledConfig"] | "", sizeof(config.ledConfig));
+    strlcpy(config.speedLimit, jsonDocument["speedLimit"] | "", sizeof(config.speedLimit));
+    strlcpy(config.ledCount, jsonDocument["ledCount"] | "", sizeof(config.ledCount));
+    strlcpy(config.ledBrightness, jsonDocument["ledBrightness"] | "", sizeof(config.ledBrightness));
 
-  configFile.close();
+    configFile.close();
+    Serial.println("Loaded config successfully.");
 }
 
-
-String generateHouseLights(int currentHour, int currentMinute, String lastOutput) {
-  if (lastOutput.length() != MAX_HOUSES) {
-    return "Invalid length";
-  }
-
-  currentLights = lastOutput; // Update the current lights state from the last output
-
-  if (currentHour >= 6 && currentHour < 17) {
-    turnOffAllLights(); // Lights off from 6:00 to 17:00
-  } else if (currentHour >= 17 && currentHour < 21) {
-    float percentage = calculatePercentage(currentHour, currentMinute, 17, 21, 0.045);
-    Serial.println("percentage"+String(percentage));
-    turnOnLights(percentage); // Turn on 4.5% of lights every 10 minutes from 17:00 to 21:00
-  } else if (currentHour >= 21 && currentHour < 22) {
-    float percentage = calculatePercentage(currentHour, currentMinute, 21, 22, 0.0125);
-    turnOnLights(percentage); // Turn on 1.25% of lights every 10 minutes from 21:00 to 22:30
-  } else if (currentHour >= 23 && currentHour < 24) {
-    float percentage = calculatePercentage(currentHour, currentMinute, 23, 24, 0.069);
-    turnOffLights(percentage); // Turn off 6.9% of lights every 10 minutes from 23:30 to 2:00
-  } else if (currentHour >= 0 && currentHour < 6) {
-    float percentage = calculatePercentage(currentHour, currentMinute, 0, 6, 0.005);
-    turnOffLights(percentage); // Turn off 0.5% of lights every 10 minutes from 2:00 to 6:00
-  }
-
-  return currentLights;
+String generateZeroString(int amount) {
+    String zeros = "";
+    for (int i = 0; i < amount; i++) {
+        zeros += '0';
+    }
+    return zeros;
 }
 
-float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, float interval) {
-    Serial.println("calculatePercentage");
-    Serial.println(String(currentHour)+","+String(currentMinute)+","+String(startHour)+","+String(endHour)+","+String(interval));
-  int totalMinutes = (endHour - startHour) * 60;
-  Serial.println("totalMinutes: "+String(totalMinutes));
-  int elapsedMinutes = ((currentHour - startHour) * 60) + currentMinute;
-  Serial.println("elapsedMinutes: "+String(elapsedMinutes));
-  float steps = totalMinutes / (interval * 10); // 10 minutes per step for given interval
-  Serial.println("steps: "+String(steps));
-  return min(double(elapsedMinutes) / steps, 1.0);
+void generateLightState(int currentHour, int currentMinute) {
+    if (currentLights.length() != atoi(config.ledCount)) {
+        Serial.println("current lights mismatches house amount");
+
+        currentLights = generateZeroString(atoi(config.ledCount));
+    }
+
+    if (currentHour >= 6 && currentHour < 8) {
+        float percentage = calculatePercentage(currentHour, currentMinute, 6, 8, 30);
+        turnOnLights(percentage); // 90% Off->On from 07:00 to 08:00
+    } else if (currentHour >= 8 && currentHour < 9) {
+        float percentage = calculatePercentage(currentHour, currentMinute, 8, 9, 40);
+        turnOffLights(percentage); // 90% Off->On from 08:00 to 09:00
+    } else if (currentHour >= 9 && currentHour < 17) {
+        turnOffAllLights(); // Lights off from 7:00 to 17:00
+    } else if (currentHour >= 17 && currentHour < 22) {
+        float percentage = calculatePercentage(currentHour, currentMinute, 17, 22, 40);
+        turnOnLights(percentage); // 90% Off->On from 17:00 to 22:00
+    } else if (currentHour >= 22 && currentHour < 23) {
+        float percentage = calculatePercentage(currentHour, currentMinute, 22, 23, 30);
+        turnOnLights(percentage); // Other 10% Off->On from 22:00 to 23:00
+    } else if (currentHour >= 23 || currentHour < 1) {
+        float percentage = calculatePercentage(currentHour, currentMinute, 23, 1, 30);
+        turnOffLights(percentage); // 90% On->Off from 23:00 to 01:00
+    } else if (currentHour >= 1 && currentHour < 7) {
+        float percentage = calculatePercentage(currentHour, currentMinute, 1, 7, 40);
+        turnOffLights(percentage); // Other 10% On->Off from 01:00 to 07:00
+    }
+}
+
+float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, int percentage) {
+    int durationHours = 0;
+
+    if(endHour > startHour) {
+        durationHours = endHour - startHour;
+    } else {
+        durationHours = (24+endHour) - startHour;
+    }
+
+    int elapsedHours = 0;
+
+    if(currentHour >= startHour) {
+        elapsedHours = currentHour-startHour;
+    } else {
+        elapsedHours = (24+currentHour) - startHour;
+    }
+
+    int elapsedMinutes = (elapsedHours * 60) + currentMinute;
+
+    return floor(( float(percentage) / ( float(durationHours) * 6.0 )) * ( float(elapsedMinutes) / 10.0 ));
 }
 
 void turnOnLights(float percentage) {
-    int lightsToTurnOn=1;
-    if(percentage>=1.0) {
-        lightsToTurnOn = MAX_HOUSES-1 * percentage;
+    int zerosCount = countZeros(currentLights);
+
+    int lightsToTurnOn = 0;
+    if (percentage > 1.0) {
+        lightsToTurnOn = (float(atoi(config.ledCount))/100.0) * percentage;
+    }
+    if (lightsToTurnOn > zerosCount) {
+        lightsToTurnOn = zerosCount;
     }
 
-    int zeros = 0;
-    for(int i=0;i<currentLights.length(); i++) {
-        if(currentLights[0]=='0') {
-            zeros++;
-        }
-    }
-
-    if(lightsToTurnOn>zeros) {
-        lightsToTurnOn = zeros;
-    }
-
-    Serial.println("lightsToTurnOn"+String(lightsToTurnOn));
     for (int i = 0; i < lightsToTurnOn; i++) {
         int randomIndex;
         do {
-            randomIndex = random(0, MAX_HOUSES);
-            Serial.println(String(randomIndex)+","+currentLights);
+            randomIndex = random(0, atoi(config.ledCount));
         } while (currentLights[randomIndex] == '1');
 
         currentLights[randomIndex] = '1';
@@ -322,38 +372,58 @@ void turnOnLights(float percentage) {
 }
 
 void turnOffLights(float percentage) {
-  int lightsToTurnOff = 1;
-  if(percentage>=1.0) {
-      lightsToTurnOff = MAX_HOUSES-1 * percentage;
-  }
+    int onesCount = countOnes(currentLights);
 
-  int ones = 0;
-  for(int i=0;i<currentLights.length(); i++) {
-      if(currentLights[0]=='1') {
-          ones++;
-      }
-  }
+    int lightsToTurnOff = 0;
+    if (percentage > 1.0) {
+        lightsToTurnOff = (float(atoi(config.ledCount))/100.0) * percentage;
+    }
 
-  if(lightsToTurnOff>ones) {
-      lightsToTurnOff = ones;
-  }
+    if (lightsToTurnOff > onesCount) {
+        lightsToTurnOff = onesCount;
+    }
 
-  Serial.println("lightsToTurnOff"+String(lightsToTurnOff));
-  for (int i = 0; i < lightsToTurnOff; i++) {
-    int randomIndex;
-    do {
-      randomIndex = random(0, MAX_HOUSES);
-      Serial.println(String(randomIndex)+","+String(currentLights));
-    } while (currentLights[randomIndex] == '0');
+    for (int i = 0; i < lightsToTurnOff; i++) {
+        int randomIndex;
+        do {
+            randomIndex = random(0, atoi(config.ledCount));
+        } while (currentLights[randomIndex] == '0');
 
-    currentLights[randomIndex] = '0';
-  }
+        currentLights[randomIndex] = '0';
+    }
+}
+
+int countZeros(String inputString) {
+    int zeroCount = 0;
+    for (int i = 0; i < inputString.length(); i++) {
+        if (inputString[i] == '0') {
+            zeroCount++;
+        }
+    }
+    return zeroCount;
+}
+
+int countOnes(String inputString) {
+    int oneCount = 0;
+    for (int i = 0; i < inputString.length(); i++) {
+        if (inputString[i] == '1') {
+            oneCount++;
+        }
+    }
+    return oneCount;
 }
 
 void turnOffAllLights() {
-  currentLights = "00000000"; // Set all lights to off
+    currentLights = generateZeroString(atoi(config.ledCount));
 }
 
+String byteToBinaryString(byte value) {
+    String result = "";
+    for( int i = 7; i >= 0; i--) {
+        result += (value & (1 << i)) ? '1' : '0';
+    }
+    return result;
+}
 
 void updateShiftRegister(int brightness, String ledString) {
     // reset array pointer
@@ -381,9 +451,8 @@ void updateShiftRegister(int brightness, String ledString) {
     setBrightness(brightness);
 
     digitalWrite(RCLK, LOW);
-    Serial.println("LED config:");
     for(int i = 0; i < numChunks; i++) {
-        Serial.println(String(i) + ": " + String(leds[i]));
+        Serial.println("    LEDS-" + String(i) + ": " + byteToBinaryString(leds[i]));
         shiftOut(SER, SRCLK, MSBFIRST, leds[i]);
     }
     digitalWrite(RCLK, HIGH);
@@ -394,19 +463,19 @@ void setBrightness(int b) {
 }
 
 String getContentType(String filename) {
-  if (filename.endsWith(".html")) return "text/html";
-  else if (filename.endsWith(".css")) return "text/css";
-  else if (filename.endsWith(".ico")) return "image/x-icon";
-  else if (filename.endsWith(".js")) return "application/javascript";
-  else if (filename.endsWith(".png")) return "image/png";
-  else if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) return "image/jpeg";
-  else if (filename.endsWith(".gif")) return "image/gif";
-  else if (filename.endsWith(".ico")) return "image/x-icon";
-  else if (filename.endsWith(".xml")) return "text/xml";
-  else if (filename.endsWith(".pdf")) return "application/x-pdf";
-  else if (filename.endsWith(".zip")) return "application/x-zip";
-  else if (filename.endsWith(".gz")) return "application/x-gzip";
-  return "text/plain";
+    if (filename.endsWith(".html")) return "text/html";
+    else if (filename.endsWith(".css")) return "text/css";
+    else if (filename.endsWith(".ico")) return "image/x-icon";
+    else if (filename.endsWith(".js")) return "application/javascript";
+    else if (filename.endsWith(".png")) return "image/png";
+    else if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) return "image/jpeg";
+    else if (filename.endsWith(".gif")) return "image/gif";
+    else if (filename.endsWith(".ico")) return "image/x-icon";
+    else if (filename.endsWith(".xml")) return "text/xml";
+    else if (filename.endsWith(".pdf")) return "application/x-pdf";
+    else if (filename.endsWith(".zip")) return "application/x-zip";
+    else if (filename.endsWith(".gz")) return "application/x-gzip";
+    return "text/plain";
 }
 
 void getLocalIP(AsyncWebServerRequest *request) {
@@ -414,11 +483,11 @@ void getLocalIP(AsyncWebServerRequest *request) {
 }
 
 void getSpeed(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain",  String(globalSpeed));
+    request->send(200, "text/plain", String(globalSpeed));
 }
 
 void getSpeedLimit(AsyncWebServerRequest *request) {
-    request->send(200, "text/plain",  String(config.speedLimit));
+    request->send(200, "text/plain", String(config.speedLimit));
 }
 
 void forgetConfig(AsyncWebServerRequest *request) {
@@ -429,7 +498,7 @@ void forgetConfig(AsyncWebServerRequest *request) {
     } else {
         Serial.println("Could not remove config file");
     }
-    request->send(200, "text/plain",  "deleted wifi config");
+    request->send(200, "text/plain", "deleted wifi config");
     ESP.restart();
 }
 
@@ -452,12 +521,12 @@ void setConfig(AsyncWebServerRequest *request) {
         request->send(200, "text/plain", "Set config -> speed: " + String(speed));
     } else if (request->hasArg("brightness") && request->hasArg("leds")) {
         int brightness = request->arg("brightness").toInt();
-        String ledConfig = request->arg("leds");
-        Serial.println("Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
+        String ledArgConfig = request->arg("leds");
+        Serial.println("Set config -> brightness: " + String(brightness) + " leds: " + ledArgConfig);
 
-        updateShiftRegister(brightness, ledConfig);
+        updateShiftRegister(brightness, ledArgConfig);
 
-        request->send(200, "text/plain", "Set config -> brightness: " + String(brightness) + " leds: " + ledConfig);
+        request->send(200, "text/plain", "Set config -> brightness: " + String(brightness) + " leds: " + ledArgConfig);
     }
     else {
         request->send(200, "text/plain", "No arg server provided");
@@ -467,7 +536,7 @@ void setConfig(AsyncWebServerRequest *request) {
 void reverseDirection(AsyncWebServerRequest *request) {
     String log = "reversed direction";
     Serial.println(log);
-    
+
     bool currPin = (digitalRead(IN4) == HIGH);
     digitalWrite(IN4, !currPin);
     digitalWrite(IN3, currPin);
