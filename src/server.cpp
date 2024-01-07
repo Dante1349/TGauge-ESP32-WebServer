@@ -7,7 +7,8 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h> // needs to be imported after WiFiManager.h because of colliding definitions
 #include <ESPmDNS.h>
-
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 #include <ArduinoJson.h>
 
 #define ENB 4
@@ -19,13 +20,17 @@
 #define SRCLK 14
 
 struct Config {
+    char timeZoneOffset[64];
     char speedLimit[64];
     char ledCount[64];
     char ledBrightness[64];
 };
 
+void printTime();
 void saveConfig(const Config& config);
 void loadConfig(Config& config);
+void updateLights(String &lights, float percentage);
+void initializeLights(int currentHour, int currentMinute);
 String generateZeroString(int amount);
 void generateLightState(int currentHour, int currentMinute);
 float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, int percentage);
@@ -43,7 +48,6 @@ void saveConfigCallback();
 void initWiFi();
 void notFound(AsyncWebServerRequest *request);
 void initWebserver();
-void initLights();
 String getContentType(String filename);
 void getLocalIP(AsyncWebServerRequest *request);
 void getSpeed(AsyncWebServerRequest *request);
@@ -55,13 +59,16 @@ void reverseDirection(AsyncWebServerRequest *request);
 WiFiManager wifiManager;
 AsyncWebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 int globalSpeed = 0;
 byte* leds;
 const int chunkSize = 8;
 int numChunks = 0;
-Config config = {"255","32", "100"};
+Config config = {"0", "255", "32", "100"};
 // Define custom parameters
+WiFiManagerParameter time_zone_offset("timeZoneOffset", "UTC Timezone Offset in hours", config.timeZoneOffset, 64);
 WiFiManagerParameter speed_limit("speedLimit", "Speed Limit (0-255)", config.speedLimit, 64);
 WiFiManagerParameter led_count("ledCount", "LED Count", config.ledCount, 64);
 WiFiManagerParameter led_brightness("ledBrightness", "LED Brightness (0-255)", config.ledBrightness, 64);
@@ -95,10 +102,12 @@ void initFS() {
 void saveConfigCallback() {
     Serial.println("Save config callback");
 
+    strlcpy(config.timeZoneOffset, time_zone_offset.getValue(), sizeof(config.timeZoneOffset));
     strlcpy(config.speedLimit, speed_limit.getValue(), sizeof(config.speedLimit));
     strlcpy(config.ledCount, led_count.getValue(), sizeof(config.ledCount));
     strlcpy(config.ledBrightness, led_brightness.getValue(), sizeof(config.ledBrightness));
 
+    Serial.println("config.timeZoneOffset: "+String(config.timeZoneOffset));
     Serial.println("config.speedLimit: "+String(config.speedLimit));
     Serial.println("config.ledCount: "+String(config.ledCount));
     Serial.println("config.ledBrightness: "+String(config.ledBrightness));
@@ -112,6 +121,7 @@ void initWiFi() {
     loadConfig(config); // Load saved config
 
     // Add custom parameters to WiFiManager
+    wifiManager.addParameter(&time_zone_offset);
     wifiManager.addParameter(&speed_limit);
     wifiManager.addParameter(&led_count);
     wifiManager.addParameter(&led_brightness);
@@ -143,6 +153,12 @@ void initWiFi() {
 
     // Add service to MDNS-SD
     MDNS.addService("http", "tcp", 80);
+    timeClient.begin();
+    int timeZoneOffsetInSeconds = atoi(config.timeZoneOffset)*3600;
+    timeClient.setTimeOffset(timeZoneOffsetInSeconds);
+    timeClient.update();
+    Serial.println("time zone offset set to: " + String(timeZoneOffsetInSeconds));
+    printTime();
 }
 
 void notFound(AsyncWebServerRequest *request) {
@@ -180,18 +196,6 @@ void initWebserver() {
     Serial.println("Web Server started");
 }
 
-void initLights() {
-    unsigned long currentMillis = millis();
-
-    // Calculate elapsed time in hours and minutes
-    unsigned long elapsedHours = (currentMillis / (1000 * 60 * 60)) % 24;
-    unsigned long elapsedMinutes = (currentMillis / (1000 * 60)) % 60;
-
-    // Initialize currentLights based on the calculated time
-    generateLightState(elapsedHours, elapsedMinutes);
-    updateShiftRegister(atoi(config.ledBrightness), currentLights);
-}
-
 void setup() {
     // put your setup code here, to run once:
     Serial.begin(115200);
@@ -205,15 +209,15 @@ void setup() {
     initFS();
     initWiFi();
     initWebserver();
-    initLights();
+    initializeLights(timeClient.getHours(), timeClient.getMinutes());
 
     Serial.println("Train-Server started");
 }
 
-int simulatedHour = 0;
-int intervalCount = 0;
 void loop() {
     webSocket.loop();
+    if (!timeClient.update()) {
+    }
 
     unsigned long currentMillis = millis();
 
@@ -221,31 +225,29 @@ void loop() {
     int testInterval = 1000 / 6; // 1 second == 1 hour
 
     if (currentMillis - lastTimeUpdate >= interval) {
-        String hour = String(simulatedHour);
-        if(hour.length() == 1){
-            hour = "0" + hour;
-        }
-
-        String minute = String(intervalCount*10);
-        if(minute.length() == 1){
-            minute = "0" + minute;
-        }
-
-        Serial.println("[" + hour + ":" + minute + "]");
+        printTime();
 
         lastTimeUpdate = currentMillis;
-        intervalCount++;
 
-        if (intervalCount > 5) {
-            intervalCount = 0;
-            simulatedHour = (simulatedHour + 1) % 24;
-        }
-
-        generateLightState(simulatedHour, intervalCount*10);
+        generateLightState(timeClient.getHours(), timeClient.getMinutes());
         updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
         Serial.println("--------------------------------------------------------------------------------");
     }
+}
+
+void printTime() {
+    String hour = String(timeClient.getHours());
+    if (hour.length() == 1) {
+        hour = '0' + hour;
+    }
+
+    String minute = String(timeClient.getMinutes());
+    if (minute.length() == 1) {
+        minute = '0' + minute;
+    }
+
+    Serial.println("[" + hour + ":" + minute + "]");
 }
 
 void saveConfig(const Config& config) {
@@ -256,6 +258,7 @@ void saveConfig(const Config& config) {
     }
 
     StaticJsonDocument<256> jsonDocument;
+    jsonDocument["timeZoneOffset"] = config.timeZoneOffset;
     jsonDocument["speedLimit"] = config.speedLimit;
     jsonDocument["ledCount"] = config.ledCount;
     jsonDocument["ledBrightness"] = config.ledBrightness;
@@ -282,12 +285,57 @@ void loadConfig(Config& config) {
         return;
     }
 
+    strlcpy(config.timeZoneOffset, jsonDocument["timeZoneOffset"] | "", sizeof(config.timeZoneOffset));
     strlcpy(config.speedLimit, jsonDocument["speedLimit"] | "", sizeof(config.speedLimit));
     strlcpy(config.ledCount, jsonDocument["ledCount"] | "", sizeof(config.ledCount));
     strlcpy(config.ledBrightness, jsonDocument["ledBrightness"] | "", sizeof(config.ledBrightness));
 
     configFile.close();
     Serial.println("Loaded config successfully.");
+}
+
+void initializeLights(int currentHour, int currentMinute) {
+    String lights = generateZeroString(atoi(config.ledCount)); // Initial state for 10 lights
+
+    printTime();
+
+    if (currentHour >= 6 && currentHour < 8) {
+        float percentage = 90; // 90% On from 6:00 to 8:00
+        updateLights(lights, percentage);
+    } else if (currentHour >= 8 && currentHour < 9) {
+        float percentage = 50; // 50% On from 8:00 to 9:00
+        updateLights(lights, percentage);
+    } else if (currentHour >= 9 && currentHour < 17) {
+        lights = generateZeroString(atoi(config.ledCount)); // All off from 9:00 to 17:00
+    } else if (currentHour >= 17 && currentHour < 22) {
+        float percentage = 80; // 80% On from 17:00 to 22:00
+        updateLights(lights, percentage);
+    } else if (currentHour >= 22 && currentHour < 23) {
+        float percentage = 90; // 90% On from 22:00 to 23:00
+        updateLights(lights, percentage);
+    } else if (currentHour >= 23 || currentHour < 1) {
+        float percentage = 20; // 20% On from 23:00 to 1:00
+        updateLights(lights, percentage);
+    } else if (currentHour >= 1 && currentHour < 7) {
+        float percentage = 5; // 5% On from 1:00 to 7:00
+        updateLights(lights, percentage);
+    }
+
+    currentLights = lights;
+    updateShiftRegister(atoi(config.ledBrightness), lights);
+}
+
+void updateLights(String &lights, float percentage) {
+    int numLights = lights.length() * percentage / 100;
+    for (int i = 0; i < lights.length(); ++i) {
+        if (numLights <= 0) {
+            break;
+        }
+        if (lights[i] == '0') {
+            lights[i] = '1';
+            numLights--;
+        }
+    }
 }
 
 String generateZeroString(int amount) {
