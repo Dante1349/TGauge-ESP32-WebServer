@@ -29,16 +29,14 @@ struct Config {
 void printTime();
 void saveConfig(const Config& config);
 void loadConfig(Config& config);
-void updateLights(String &lights, float percentage);
-void initializeLights(int currentHour, int currentMinute);
+String generateHouseLights(String input, int houseArray[], int arrayLength, float desiredPercentage);
+float calcPercentage(float startPercentage, float targetPercentage, int intervalInMinutes, int hour, int minute, int startHour, int endHour);
+String removeCharAtIndex(String str, int index);
+String changeCharAtIndex(String str, int index, char newChar);
+String generateLightState(String input, int houseArray[], int houseArrayLength, int commercialArray[], int commercialArrayLength, int streetArray[], int streetArrayLength, int currentHour, int currentMinute);
 String generateZeroString(int amount);
-void generateLightState(int currentHour, int currentMinute);
-float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, int percentage);
-void turnOnLights(float percentage);
-void turnOffLights(float percentage);
 int countZeros(String inputString);
 int countOnes(String inputString);
-void turnOffAllLights();
 String byteToBinaryString(byte value);
 void updateShiftRegister(int brightness, String ledString);
 void setBrightness(int b);
@@ -67,6 +65,9 @@ byte* leds;
 const int chunkSize = 8;
 int numChunks = 0;
 Config config = {"0", "255", "32", "100"};
+int houses[] = {0,1,2,3};
+int commercialBuildings[] = {4,5};
+int streetLights[] = {6,7};
 // Define custom parameters
 WiFiManagerParameter time_zone_offset("timeZoneOffset", "UTC Timezone Offset in hours", config.timeZoneOffset, 64);
 WiFiManagerParameter speed_limit("speedLimit", "Speed Limit (0-255)", config.speedLimit, 64);
@@ -209,7 +210,9 @@ void setup() {
     initFS();
     initWiFi();
     initWebserver();
-    initializeLights(timeClient.getHours(), timeClient.getMinutes());
+
+    currentLights = generateLightState(generateZeroString(atoi(config.ledCount)), houses, 4, commercialBuildings, 2, streetLights, 2, 13, 0);
+    updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
     Serial.println("Train-Server started");
 }
@@ -229,7 +232,7 @@ void loop() {
 
         lastTimeUpdate = currentMillis;
 
-        generateLightState(timeClient.getHours(), timeClient.getMinutes());
+        currentLights = generateLightState(currentLights, houses, 4, commercialBuildings, 2, streetLights, 2, timeClient.getHours(), timeClient.getMinutes());
         updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
         Serial.println("--------------------------------------------------------------------------------");
@@ -294,48 +297,216 @@ void loadConfig(Config& config) {
     Serial.println("Loaded config successfully.");
 }
 
-void initializeLights(int currentHour, int currentMinute) {
-    String lights = generateZeroString(atoi(config.ledCount)); // Initial state for 10 lights
+String generateLightState(String input, int houseArray[], int houseArrayLength, int commercialArray[], int commercialArrayLength, int streetArray[], int streetArrayLength, int currentHour, int currentMinute) {
+    String lightString = input;
 
-    printTime();
-
-    if (currentHour >= 6 && currentHour < 8) {
-        float percentage = 90; // 90% On from 6:00 to 8:00
-        updateLights(lights, percentage);
-    } else if (currentHour >= 8 && currentHour < 9) {
-        float percentage = 50; // 50% On from 8:00 to 9:00
-        updateLights(lights, percentage);
-    } else if (currentHour >= 9 && currentHour < 17) {
-        lights = generateZeroString(atoi(config.ledCount)); // All off from 9:00 to 17:00
-    } else if (currentHour >= 17 && currentHour < 22) {
-        float percentage = 80; // 80% On from 17:00 to 22:00
-        updateLights(lights, percentage);
-    } else if (currentHour >= 22 && currentHour < 23) {
-        float percentage = 90; // 90% On from 22:00 to 23:00
-        updateLights(lights, percentage);
-    } else if (currentHour >= 23 || currentHour < 1) {
-        float percentage = 20; // 20% On from 23:00 to 1:00
-        updateLights(lights, percentage);
-    } else if (currentHour >= 1 && currentHour < 7) {
-        float percentage = 5; // 5% On from 1:00 to 7:00
-        updateLights(lights, percentage);
+    if ((currentHour >= 5) && (currentHour < 7)) {
+        float percentage = calcPercentage(0, 100, 10, currentHour, currentMinute, 5, 7);
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
+    } else if ((currentHour >= 7) && (currentHour < 9)) {
+        float percentage = calcPercentage(100, 0, 10, currentHour, currentMinute, 7, 9);
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
+    } else if ((currentHour >= 9) && (currentHour < 16)) {
+        float percentage = 0;
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
+    } else if ((currentHour >= 16) && (currentHour < 18)) {
+        float percentage = calcPercentage(0, 100, 10, currentHour, currentMinute, 16, 18);
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
+    } else if ((currentHour >= 18) && (currentHour < 20)) {
+        float percentage = 100;
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
+    } else if ((currentHour >= 20) || (currentHour < 4)) {
+        float percentage = calcPercentage(100, 0, 10, currentHour, currentMinute, 20, 4);
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
+    } else {
+        float percentage = 0;
+        lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
     }
 
-    currentLights = lights;
-    updateShiftRegister(atoi(config.ledBrightness), lights);
+    // Commercial lights
+    if (currentHour >= 9 && currentHour < 20) {
+        // Commercial on
+        for (int i = 0; i < commercialArrayLength; i++) {
+            lightString = changeCharAtIndex(lightString, commercialArray[i], '1');
+        }
+    } else {
+        // Commercial off
+        for (int i = 0; i < commercialArrayLength; i++) {
+            lightString = changeCharAtIndex(lightString, commercialArray[i], '0');
+        }
+    }
+
+    // Street lights
+    if (currentHour >= 17 && currentHour <= 23) {
+        // Street lights on
+        for (int i = 0; i < streetArrayLength; i++) {
+            lightString = changeCharAtIndex(lightString, streetArray[i], '1');
+        }
+    } else {
+        // Street lights off
+        for (int i = 0; i < streetArrayLength; i++) {
+            lightString = changeCharAtIndex(lightString, streetArray[i], '0');
+        }
+    }
+
+    return lightString;
 }
 
-void updateLights(String &lights, float percentage) {
-    int numLights = lights.length() * percentage / 100;
-    for (int i = 0; i < lights.length(); ++i) {
-        if (numLights <= 0) {
-            break;
-        }
-        if (lights[i] == '0') {
-            lights[i] = '1';
-            numLights--;
+String generateHouseLights(String input, int houseArray[], int arrayLength, float desiredPercentage) {
+    String result = input;
+
+    // Only include house array indexes
+    String tempArr = "";
+    for (int i = 0; i < arrayLength; i++) {
+        if (std::find(houseArray, houseArray + arrayLength, i) != houseArray + arrayLength) {
+            tempArr += input[i];
         }
     }
+
+    // Count number of house lights that are off
+    int noOnes = std::count(tempArr.begin(), tempArr.end(), '1');
+    // Count number of house lights that are on
+    int noZeros = std::count(tempArr.begin(), tempArr.end(), '0');
+    // Count number of house lights
+    int allHouseLights = tempArr.length();
+
+    float currPercentage = (noOnes / (float)allHouseLights) * 100;
+
+    if (currPercentage >= desiredPercentage) {
+        float percentageDiff = currPercentage - desiredPercentage;
+        float lightsPercentageDiff = (allHouseLights / 100.0) * percentageDiff;
+        Serial.print("Too many lights are turned on. ");
+        Serial.print(percentageDiff);
+        Serial.print("% too many Lights. That are ");
+        Serial.print(lightsPercentageDiff);
+        Serial.println(" Lights");
+
+        int lightsToTurnOff = ceil(lightsPercentageDiff);
+
+        if (lightsToTurnOff > noOnes) {
+            lightsToTurnOff = noOnes;
+        }
+
+        if (lightsToTurnOff >= 1) {
+            Serial.print("Turning off ");
+            Serial.print(lightsToTurnOff);
+            Serial.println(" lights.");
+
+            int lightsTurnedOff = 0;
+            while (lightsTurnedOff < lightsToTurnOff) {
+                int randomIndex = random(0, allHouseLights);
+
+                if (result[randomIndex] == '1' && std::find(houseArray, houseArray + arrayLength, randomIndex) != houseArray + arrayLength) {
+                    result[randomIndex] = '0';
+                    lightsTurnedOff++;
+                }
+            }
+
+            return result;
+        } else {
+            return result;
+        }
+    } else {
+        float percentageDiff = currPercentage + (desiredPercentage - currPercentage);
+        float lightsPercentageDiff = (allHouseLights / 100.0) * percentageDiff;
+        Serial.print("Not enough lights are turned on. ");
+        Serial.print(percentageDiff);
+        Serial.print("% too few Lights. That are ");
+        Serial.print(lightsPercentageDiff);
+        Serial.println(" Lights");
+
+        int lightsToTurnOn = floor(lightsPercentageDiff);
+
+        if (lightsToTurnOn > noZeros) {
+            lightsToTurnOn = noZeros;
+        }
+
+        if (lightsToTurnOn >= 1) {
+            Serial.print("Turning on ");
+            Serial.print(lightsToTurnOn);
+            Serial.println(" lights.");
+
+            int lightsTurnedOn = 0;
+            while (lightsTurnedOn < lightsToTurnOn) {
+                int randomIndex = random(0, allHouseLights);
+
+                if (result[randomIndex] == '0' && std::find(houseArray, houseArray + arrayLength, randomIndex) != houseArray + arrayLength) {
+                    result[randomIndex] = '1';
+                    lightsTurnedOn++;
+                }
+            }
+
+            return result;
+        } else {
+            return result;
+        }
+    }
+}
+
+float calcPercentage(float startPercentage, float targetPercentage, int intervalInMinutes, int hour, int minute, int startHour, int endHour) {
+    float duration = 0;
+    if (startHour <= endHour) {
+        duration = endHour - startHour;
+    } else {
+        duration = (24 + endHour) - startHour;
+    }
+
+    duration = duration * 60; // 60 minutes per hour
+
+    float steps = duration / intervalInMinutes;
+
+    int elapsedHours = 0;
+    if (startHour <= hour) {
+        elapsedHours = hour - startHour;
+    } else {
+        elapsedHours = (24 + hour) - startHour;
+    }
+
+    int currentStep = ((elapsedHours * 60) + minute) / intervalInMinutes;
+
+    float newPercentage = 0;
+    if (startPercentage > targetPercentage) {
+        float diff = startPercentage - targetPercentage;
+        float stepPercentage = diff / steps;
+        float percentageChange = stepPercentage * currentStep;
+        newPercentage = startPercentage - percentageChange;
+    } else {
+        float diff = targetPercentage - startPercentage;
+        float stepPercentage = diff / steps;
+        float percentageChange = stepPercentage * currentStep;
+        newPercentage = startPercentage + percentageChange;
+    }
+
+    return newPercentage;
+}
+
+// Function to change a character at a specific index in a string
+String changeCharAtIndex(String str, int index, char newChar) {
+    if (index < 0 || index >= str.length()) {
+        // If the index is out of bounds, return the original string
+        return str;
+    }
+
+    // Convert the string to a character array
+    char strArray[str.length() + 1];
+    str.toCharArray(strArray, str.length() + 1);
+
+    // Replace the character at the specified index
+    strArray[index] = newChar;
+
+    // Convert the character array back to a string and return
+    return String(strArray);
+}
+
+// Function to remove a character at a specific index from a string
+String removeCharAtIndex(String str, int index) {
+    if (index < 0 || index >= str.length()) {
+        // If the index is out of bounds, return the original string
+        return str;
+    }
+
+    // Create a new string by excluding the character at the specified index
+    return str.substring(0, index) + str.substring(index + 1);
 }
 
 String generateZeroString(int amount) {
@@ -346,100 +517,6 @@ String generateZeroString(int amount) {
     return zeros;
 }
 
-void generateLightState(int currentHour, int currentMinute) {
-    if (currentLights.length() != atoi(config.ledCount)) {
-        Serial.println("current lights mismatches house amount");
-
-        currentLights = generateZeroString(atoi(config.ledCount));
-    }
-
-    if (currentHour >= 6 && currentHour < 8) {
-        float percentage = calculatePercentage(currentHour, currentMinute, 6, 8, 30);
-        turnOnLights(percentage); // 90% Off->On from 06:00 to 08:00
-    } else if (currentHour >= 8 && currentHour < 9) {
-        float percentage = calculatePercentage(currentHour, currentMinute, 8, 9, 40);
-        turnOffLights(percentage); // 90% Off->On from 08:00 to 09:00
-    } else if (currentHour >= 9 && currentHour < 17) {
-        turnOffAllLights(); // Lights off from 7:00 to 17:00
-    } else if (currentHour >= 17 && currentHour < 22) {
-        float percentage = calculatePercentage(currentHour, currentMinute, 17, 22, 40);
-        turnOnLights(percentage); // 90% Off->On from 17:00 to 22:00
-    } else if (currentHour >= 22 && currentHour < 23) {
-        float percentage = calculatePercentage(currentHour, currentMinute, 22, 23, 30);
-        turnOnLights(percentage); // Other 10% Off->On from 22:00 to 23:00
-    } else if (currentHour >= 23 || currentHour < 1) {
-        float percentage = calculatePercentage(currentHour, currentMinute, 23, 1, 30);
-        turnOffLights(percentage); // 90% On->Off from 23:00 to 01:00
-    } else if (currentHour >= 1 && currentHour < 7) {
-        float percentage = calculatePercentage(currentHour, currentMinute, 1, 7, 40);
-        turnOffLights(percentage); // Other 10% On->Off from 01:00 to 07:00
-    }
-}
-
-float calculatePercentage(int currentHour, int currentMinute, int startHour, int endHour, int percentage) {
-    int durationHours = 0;
-
-    if(endHour > startHour) {
-        durationHours = endHour - startHour;
-    } else {
-        durationHours = (24+endHour) - startHour;
-    }
-
-    int elapsedHours = 0;
-
-    if(currentHour >= startHour) {
-        elapsedHours = currentHour-startHour;
-    } else {
-        elapsedHours = (24+currentHour) - startHour;
-    }
-
-    int elapsedMinutes = (elapsedHours * 60) + currentMinute;
-
-    return floor(( float(percentage) / ( float(durationHours) * 6.0 )) * ( float(elapsedMinutes) / 10.0 ));
-}
-
-void turnOnLights(float percentage) {
-    int zerosCount = countZeros(currentLights);
-
-    int lightsToTurnOn = 0;
-    if (percentage > 1.0) {
-        lightsToTurnOn = (float(atoi(config.ledCount))/100.0) * percentage;
-    }
-    if (lightsToTurnOn > zerosCount) {
-        lightsToTurnOn = zerosCount;
-    }
-
-    for (int i = 0; i < lightsToTurnOn; i++) {
-        int randomIndex;
-        do {
-            randomIndex = random(0, atoi(config.ledCount));
-        } while (currentLights[randomIndex] == '1');
-
-        currentLights[randomIndex] = '1';
-    }
-}
-
-void turnOffLights(float percentage) {
-    int onesCount = countOnes(currentLights);
-
-    int lightsToTurnOff = 0;
-    if (percentage > 1.0) {
-        lightsToTurnOff = (float(atoi(config.ledCount))/100.0) * percentage;
-    }
-
-    if (lightsToTurnOff > onesCount) {
-        lightsToTurnOff = onesCount;
-    }
-
-    for (int i = 0; i < lightsToTurnOff; i++) {
-        int randomIndex;
-        do {
-            randomIndex = random(0, atoi(config.ledCount));
-        } while (currentLights[randomIndex] == '0');
-
-        currentLights[randomIndex] = '0';
-    }
-}
 
 int countZeros(String inputString) {
     int zeroCount = 0;
@@ -459,10 +536,6 @@ int countOnes(String inputString) {
         }
     }
     return oneCount;
-}
-
-void turnOffAllLights() {
-    currentLights = generateZeroString(atoi(config.ledCount));
 }
 
 String byteToBinaryString(byte value) {
