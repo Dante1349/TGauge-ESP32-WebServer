@@ -322,7 +322,7 @@ String generateLightState(String input, int houseArray[], int houseArrayLength, 
         float percentage = 100;
         lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
     } else if ((currentHour >= 22) || (currentHour < 4)) {
-        float percentage = calcPercentage(100, 0, 10, currentHour, currentMinute, 20, 4);
+        float percentage = calcPercentage(100, 0, 10, currentHour, currentMinute, 22, 4);
         lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
     } else {
         float percentage = 0;
