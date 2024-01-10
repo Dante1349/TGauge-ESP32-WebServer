@@ -23,7 +23,6 @@
 # Natural Lights
 Natural lights can be defined in three types, houses, commercial buildings and street lights. These are the configured times how the lights behave: 
 
-![light_time_table](assets/light_time_table.drawio.svg)
 
 ## Usage
 * Look for WiFis and Connect to the "Train-Server-AP" Access Point. Enter your WiFi crendentials. The AP will automatically connect to your wifi.
