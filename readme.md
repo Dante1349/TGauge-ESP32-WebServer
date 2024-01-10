@@ -20,6 +20,8 @@
 * *GPIO5* H-Bridge Pin 1
 * *GPIO6* H-Bridge Pin 2
 
+# Natural Lights
+Natural lights can be defined in three types, houses, commercial buildings and street lights. These are the configured times how the lights behave: 
 ![wiring](assets/light_time_table.drawio.svg)
 
 ## Usage
