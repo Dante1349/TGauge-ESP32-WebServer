@@ -35,8 +35,6 @@ String removeCharAtIndex(String str, int index);
 String changeCharAtIndex(String str, int index, char newChar);
 String generateLightState(String input, int houseArray[], int houseArrayLength, int commercialArray[], int commercialArrayLength, int streetArray[], int streetArrayLength, int currentHour, int currentMinute);
 String generateZeroString(int amount);
-int countZeros(String inputString);
-int countOnes(String inputString);
 String byteToBinaryString(byte value);
 void updateShiftRegister(int brightness, String ledString);
 void setBrightness(int b);
@@ -211,7 +209,11 @@ void setup() {
     initWiFi();
     initWebserver();
 
-    currentLights = generateLightState(generateZeroString(atoi(config.ledCount)), houses, 3, commercialBuildings, 1, streetLights, 4, timeClient.getHours(), timeClient.getMinutes());
+    int houseArrayLength = sizeof(houses) / sizeof(houses[0]);
+    int commercialArrayLength = sizeof(commercialBuildings) / sizeof(commercialBuildings[0]);
+    int streetArrayLength = sizeof(streetLights) / sizeof(streetLights[0]);
+
+    currentLights = generateLightState(generateZeroString(atoi(config.ledCount)), houses, houseArrayLength, commercialBuildings, commercialArrayLength, streetLights, streetArrayLength, timeClient.getHours(), timeClient.getMinutes());
     updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
     Serial.println("Train-Server started");
@@ -232,7 +234,11 @@ void loop() {
 
         lastTimeUpdate = currentMillis;
 
-        currentLights = generateLightState(currentLights, houses, 3, commercialBuildings, 1, streetLights, 4, timeClient.getHours(), timeClient.getMinutes());
+        int houseArrayLength = sizeof(houses) / sizeof(houses[0]);
+        int commercialArrayLength = sizeof(commercialBuildings) / sizeof(commercialBuildings[0]);
+        int streetArrayLength = sizeof(streetLights) / sizeof(streetLights[0]);
+
+        currentLights = generateLightState(generateZeroString(atoi(config.ledCount)), houses, houseArrayLength, commercialBuildings, commercialArrayLength, streetLights, streetArrayLength, timeClient.getHours(), timeClient.getMinutes());
         updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
         Serial.println("--------------------------------------------------------------------------------");
@@ -312,10 +318,10 @@ String generateLightState(String input, int houseArray[], int houseArrayLength, 
     } else if ((currentHour >= 16) && (currentHour < 18)) {
         float percentage = calcPercentage(0, 100, 10, currentHour, currentMinute, 16, 18);
         lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
-    } else if ((currentHour >= 18) && (currentHour < 20)) {
+    } else if ((currentHour >= 18) && (currentHour < 22)) {
         float percentage = 100;
         lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
-    } else if ((currentHour >= 20) || (currentHour < 4)) {
+    } else if ((currentHour >= 22) || (currentHour < 4)) {
         float percentage = calcPercentage(100, 0, 10, currentHour, currentMinute, 20, 4);
         lightString = generateHouseLights(input, houseArray, houseArrayLength, percentage);
     } else {
@@ -515,27 +521,6 @@ String generateZeroString(int amount) {
         zeros += '0';
     }
     return zeros;
-}
-
-
-int countZeros(String inputString) {
-    int zeroCount = 0;
-    for (int i = 0; i < inputString.length(); i++) {
-        if (inputString[i] == '0') {
-            zeroCount++;
-        }
-    }
-    return zeroCount;
-}
-
-int countOnes(String inputString) {
-    int oneCount = 0;
-    for (int i = 0; i < inputString.length(); i++) {
-        if (inputString[i] == '1') {
-            oneCount++;
-        }
-    }
-    return oneCount;
 }
 
 String byteToBinaryString(byte value) {
