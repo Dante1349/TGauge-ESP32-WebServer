@@ -387,7 +387,13 @@ String generateHouseLights(String input, int houseArray[], int arrayLength, floa
         Serial.print(lightsPercentageDiff);
         Serial.println(" Lights");
 
-        int lightsToTurnOff = ceil(lightsPercentageDiff);
+        int lightsToTurnOff = 0;
+        float randomValue = random(1000) / 1000.0;
+        if(randomValue > 0.50){
+            lightsToTurnOff = ceil(lightsPercentageDiff);
+        } else {
+            lightsToTurnOff = floor(lightsPercentageDiff);
+        }
 
         if (lightsToTurnOff > noOnes) {
             lightsToTurnOff = noOnes;
@@ -421,7 +427,13 @@ String generateHouseLights(String input, int houseArray[], int arrayLength, floa
         Serial.print(lightsPercentageDiff);
         Serial.println(" Lights");
 
-        int lightsToTurnOn = floor(lightsPercentageDiff);
+        int lightsToTurnOn = 0;
+        float randomValue = random(1000) / 1000.0;
+        if(randomValue > 0.50){
+            lightsToTurnOn = floor(lightsPercentageDiff);
+        } else {
+            lightsToTurnOn = ceil(lightsPercentageDiff);
+        }
 
         if (lightsToTurnOn > noZeros) {
             lightsToTurnOn = noZeros;
