@@ -128,6 +128,9 @@ void initWiFi() {
     // Save custom parameter on save
     wifiManager.setSaveConfigCallback(saveConfigCallback);
 
+    wifiManager.setConnectTimeout(180);
+    wifiManager.setConnectRetries(20);
+
     //set custom ip for portal
     //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
     wifiManager.autoConnect("Train-Server-AP");
