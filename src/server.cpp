@@ -65,9 +65,9 @@ byte* leds;
 const int chunkSize = 8;
 int numChunks = 0;
 Config config = {"0", "255", "32", "100"};
-int houses[] = {0,1,2,3};
-int commercialBuildings[] = {4,5};
-int streetLights[] = {6,7};
+int houses[] = {1,2,3};
+int commercialBuildings[] = {0};
+int streetLights[] = {4,5,6,7};
 // Define custom parameters
 WiFiManagerParameter time_zone_offset("timeZoneOffset", "UTC Timezone Offset in hours", config.timeZoneOffset, 64);
 WiFiManagerParameter speed_limit("speedLimit", "Speed Limit (0-255)", config.speedLimit, 64);
@@ -211,7 +211,7 @@ void setup() {
     initWiFi();
     initWebserver();
 
-    currentLights = generateLightState(generateZeroString(atoi(config.ledCount)), houses, 4, commercialBuildings, 2, streetLights, 2, 13, 0);
+    currentLights = generateLightState(generateZeroString(atoi(config.ledCount)), houses, 3, commercialBuildings, 1, streetLights, 4, timeClient.getHours(), timeClient.getMinutes());
     updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
     Serial.println("Train-Server started");
@@ -232,7 +232,7 @@ void loop() {
 
         lastTimeUpdate = currentMillis;
 
-        currentLights = generateLightState(currentLights, houses, 4, commercialBuildings, 2, streetLights, 2, timeClient.getHours(), timeClient.getMinutes());
+        currentLights = generateLightState(currentLights, houses, 3, commercialBuildings, 1, streetLights, 4, timeClient.getHours(), timeClient.getMinutes());
         updateShiftRegister(atoi(config.ledBrightness), currentLights);
 
         Serial.println("--------------------------------------------------------------------------------");
@@ -337,7 +337,7 @@ String generateLightState(String input, int houseArray[], int houseArrayLength, 
     }
 
     // Street lights
-    if (currentHour >= 17 && currentHour <= 23) {
+    if (currentHour >= 17 && currentHour <= 23 || currentHour >= 5 && currentHour < 8) {
         // Street lights on
         for (int i = 0; i < streetArrayLength; i++) {
             lightString = changeCharAtIndex(lightString, streetArray[i], '1');
