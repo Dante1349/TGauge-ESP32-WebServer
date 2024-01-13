@@ -29,6 +29,9 @@ struct Config {
 void printTime();
 void saveConfig(const Config& config);
 void loadConfig(Config& config);
+int countZeros(String s);
+int countOnes(String s);
+bool isHouse(int value, int size);
 String generateHouseLights(String input, int houseArray[], int arrayLength, float desiredPercentage);
 float calcPercentage(float startPercentage, float targetPercentage, int intervalInMinutes, int hour, int minute, int startHour, int endHour);
 String removeCharAtIndex(String str, int index);
@@ -63,9 +66,9 @@ byte* leds;
 const int chunkSize = 8;
 int numChunks = 0;
 Config config = {"0", "255", "32", "100"};
-int houses[] = {1,2,3};
-int commercialBuildings[] = {0};
-int streetLights[] = {4,5,6,7};
+int houses[] = {4,5,6};
+int commercialBuildings[] = {7};
+int streetLights[] = {0,1,2,3};
 // Define custom parameters
 WiFiManagerParameter time_zone_offset("timeZoneOffset", "UTC Timezone Offset in hours", config.timeZoneOffset, 64);
 WiFiManagerParameter speed_limit("speedLimit", "Speed Limit (0-255)", config.speedLimit, 64);
@@ -361,23 +364,57 @@ String generateLightState(String input, int houseArray[], int houseArrayLength, 
     return lightString;
 }
 
+int countOnes(String s) {
+  int count = 0;
+
+  for (int i = 0; i < s.length(); i++) {
+    if (s.charAt(i) == '1') {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+int countZeros(String s) {
+  int count = 0;
+
+  for (int i = 0; i < s.length(); i++) {
+    if (s.charAt(i) == '0') {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+bool isHouse(int value, int size) {
+  for (int i = 0; i < size; i++) {
+    if (houses[i] == value) {
+      return true;
+    }
+  }
+  return false;
+}
+
 String generateHouseLights(String input, int houseArray[], int arrayLength, float desiredPercentage) {
     String result = input;
 
     // Only include house array indexes
-    String tempArr = "";
-    for (int i = 0; i < arrayLength; i++) {
-        if (std::find(houseArray, houseArray + arrayLength, i) != houseArray + arrayLength) {
-            tempArr += input[i];
-        }
+    String tempLEDs = "";
+    for (int i = 0; i < input.length(); i++) {
+      if (isHouse(i, arrayLength)) {
+        tempLEDs += input[i];
+      }
     }
 
     // Count number of house lights that are off
-    int noOnes = std::count(tempArr.begin(), tempArr.end(), '1');
+    int noOnes = countOnes(tempLEDs);
     // Count number of house lights that are on
-    int noZeros = std::count(tempArr.begin(), tempArr.end(), '0');
+    int noZeros = countZeros(tempLEDs);
     // Count number of house lights
-    int allHouseLights = tempArr.length();
+    int allHouseLights = tempLEDs.length();
+
 
     float currPercentage = (noOnes / (float)allHouseLights) * 100;
 
@@ -409,9 +446,9 @@ String generateHouseLights(String input, int houseArray[], int arrayLength, floa
 
             int lightsTurnedOff = 0;
             while (lightsTurnedOff < lightsToTurnOff) {
-                int randomIndex = random(0, allHouseLights);
+                int randomIndex = random(0, result.length());
 
-                if (result[randomIndex] == '1' && std::find(houseArray, houseArray + arrayLength, randomIndex) != houseArray + arrayLength) {
+                if (result[randomIndex] == '1' && isHouse(randomIndex, arrayLength)) {
                     result[randomIndex] = '0';
                     lightsTurnedOff++;
                 }
@@ -449,9 +486,9 @@ String generateHouseLights(String input, int houseArray[], int arrayLength, floa
 
             int lightsTurnedOn = 0;
             while (lightsTurnedOn < lightsToTurnOn) {
-                int randomIndex = random(0, allHouseLights);
+                int randomIndex = random(0, result.length());
 
-                if (result[randomIndex] == '0' && std::find(houseArray, houseArray + arrayLength, randomIndex) != houseArray + arrayLength) {
+                if (result[randomIndex] == '0' && isHouse(randomIndex, arrayLength)) {
                     result[randomIndex] = '1';
                     lightsTurnedOn++;
                 }
